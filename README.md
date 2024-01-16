@@ -6,10 +6,11 @@ LinguaCafe is a free self-hosted software that helps language learners acquire v
 
 You can read about all the features of LinguaCafe on the [overview](https://simjanos-dev.github.io/LinguaCafeHome/) GitHub Page, and on the [user manual](https://github.com/simjanos-dev/LinguaCafe/wiki/1.-Home) GitHub Wiki page.
 
-&nbsp;
-&nbsp;
+Supported platforms:  
+- x64, which includes most desktop computers made in the last decade.  
+- Macs with Apple silicon are supported, but need to uncomment the line that says `platform: linux/amd64` by removing the "#" near the end of the file.  
 
-![Library](/GithubImages/LibraryCover.jpg)
+Other Armv8 devices such as Raspberry Pis 3 and newer do not work at the moment.  
 
 ![Reader](/GithubImages/TextReader.jpg)
 
