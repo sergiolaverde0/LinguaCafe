@@ -7,6 +7,7 @@
             :item-id="vocabularyEditDialog.itemId" 
             :item-type="vocabularyEditDialog.itemType" 
             :language="$props.language"
+            @saved="loadVocabularySearchPage"
         ></vocabulary-edit-dialog>
 
         <!-- Vocabulary export dialog -->
@@ -14,8 +15,16 @@
             v-if="vocabularyExportDialog.active"
             v-model="vocabularyExportDialog.active" 
             :sample-words="words"
+            :language="$props.language"
+            :languageSpaces="languageSpaces"
             @export-to-csv="exportToCsv"
         ></vocabulary-export-dialog>
+
+        <!-- Vocabulary import dialog -->
+        <vocabulary-import-dialog 
+            v-if="vocabularyImportDialog.active"
+            v-model="vocabularyImportDialog.active"
+        ></vocabulary-import-dialog>
 
         <!-- Search header -->
         <v-card outlined class="rounded-lg px-4 pb-4 my-4" :loading="loading">
@@ -38,14 +47,14 @@
                     <v-menu offset-y>
                         <template v-slot:activator="{ on, attrs }">
                             <v-btn class="filter-menu pl-3 pr-2 mx-1" rounded depressed v-bind="attrs" v-on="on">
-                                Stage
+                                Level
                                 <v-icon v-if="attrs['aria-expanded'] === 'true' ">mdi-chevron-up</v-icon>
                                 <v-icon v-if="attrs['aria-expanded'] !== 'true'">mdi-chevron-down</v-icon>
                             </v-btn>
                         </template>
                         <v-list class="filter-popup pa-0" dense>
                             <v-list-item-group color="primary">
-                                <v-list-item :class="{'v-list-item--active': filters.stage == 'any'}" @click="applyFilter('stage', 'any')">Any</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.stage == -999}" @click="applyFilter('stage', -999)">Any</v-list-item>
                                 <v-list-item :class="{'v-list-item--active': filters.stage == 2}" @click="applyFilter('stage', 2)">New</v-list-item>
                                 <v-list-item :class="{'v-list-item--active': filters.stage == 1}" @click="applyFilter('stage', 1)">Ignored</v-list-item>
                                 <v-list-item :class="{'v-list-item--active': filters.stage == 0}" @click="applyFilter('stage', 0)">Learned</v-list-item>
@@ -71,7 +80,7 @@
                         </template>
                         <v-list class="filter-popup pa-0" dense>
                             <v-list-item-group color="primary">
-                                <v-list-item :class="{'v-list-item--active': filters.book == 'any'}" @click="applyFilter('book', 'any', -1)">Any</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.book == -1}" @click="applyFilter('book', -1, -1)">Any</v-list-item>
                                 <v-list-item 
                                     v-for="(book, index) in books" :key="index"
                                     :class="{'v-list-item--active': filters.book == book.id}"
@@ -92,7 +101,7 @@
                         </template>
                         <v-list class="filter-popup pa-0" dense>
                             <v-list-item-group color="primary">
-                                <v-list-item :class="{'v-list-item--active': filters.chapter == 'any'}" @click="applyFilter('chapter', 'any')">Any</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.chapter == -1}" @click="applyFilter('chapter', -1)">Any</v-list-item>
                                 <v-list-item 
                                     v-for="(chapter, index) in books[filters.bookIndex].chapters" :key="index"
                                     :class="{'v-list-item--active': filters.chapter == chapter.id}"
@@ -191,7 +200,10 @@
                         </template>
                         <v-list class="filter-popup pa-0" dense>
                             <v-list-item @click="openExportDialog" :disabled="loading">
-                                <v-icon class="mr-1">mdi-file-delimited</v-icon>Export to csv
+                                <v-icon class="mr-1">mdi-file-delimited</v-icon>Export
+                            </v-list-item>
+                            <v-list-item @click="openImportDialog" :disabled="loading">
+                                <v-icon class="mr-1">mdi-file-delimited</v-icon>Import
                             </v-list-item>
                         </v-list>
                     </v-menu>
@@ -199,7 +211,7 @@
             </v-container>
         </v-card>
 
-        <!-- vocabulary list -->
+        <!-- Vocabulary list -->
         <v-simple-table id="vocabulary-list" class="py-0 no-hover border rounded-lg" dense>
             <thead>
                 <tr>
@@ -214,8 +226,8 @@
             <tbody>
                 <tr v-for="(word, index) in words" :key="index">
                     <template v-if="word.type == 'phrase'">
-                        <td class="word" v-if="($props.language == 'japanese' || $props.language == 'chinese')">{{ (JSON.parse(word.word)).join('') }}</td>
-                        <td class="word" v-if="($props.language !== 'japanese' && $props.language !== 'chinese')">{{ (JSON.parse(word.word)).join(' ') }}</td>
+                        <td class="word" v-if="!languageSpaces">{{ (JSON.parse(word.word)).join('') }}</td>
+                        <td class="word" v-if="languageSpaces">{{ (JSON.parse(word.word)).join(' ') }}</td>
                     </template>
                     <template v-if="word.type == 'word'">
                         <td class="word">{{ word.word }}</td>
@@ -223,10 +235,10 @@
                     <td class="reading" v-if="($props.language == 'japanese' || $props.language == 'chinese')">{{ word.reading }}</td>
                     
                     <template v-if="word.type == 'phrase'">
-                        <td class="word-with-reading" v-if="($props.language == 'japanese' || $props.language == 'chinese')">
+                        <td class="word-with-reading" v-if="!languageSpaces">
                             {{ (JSON.parse(word.word)).join('') }}
                         </td>
-                        <td class="word-with-reading" v-if="($props.language !== 'japanese' && $props.language !== 'chinese')">
+                        <td class="word-with-reading" v-if="languageSpaces">
                             {{ (JSON.parse(word.word)).join(' ') }}
                         </td>
                     </template>
@@ -302,7 +314,10 @@
                 currentPage: 1,
                 vocabularyExportDialog: {
                     active: false,
-                    },
+                },
+                vocabularyImportDialog: {
+                    active: false,
+                },
                 vocabularyEditDialog: {
                     active: false,
                     wordId: -1,
@@ -310,14 +325,15 @@
                 },
                 filters: {
                     bookIndex: -1,
-                    stage: 'any',
-                    book: 'any',
-                    chapter: 'any',
+                    stage: -999,
+                    book: -1,
+                    chapter: -1,
                     translation: 'any',
                     phrases: 'both',
                     orderBy: 'words',
                     text: ''
-                }
+                },
+                languageSpaces: true,
             }
         },
         props: {
@@ -339,41 +355,48 @@
                 this.currentPage = parseInt(this.$route.params.page);
             }
 
-            axios.post('/vocabulary/search', {
-                text: (this.filters.text == '') ? 'anytext' : this.filters.text,
-                book: this.filters.book,
-                chapter: this.filters.chapter,
-                stage: this.filters.stage,
-                translation: this.filters.translation,
-                phrases: this.filters.phrases,
-                orderBy: this.filters.orderBy,
-                page: this.currentPage,
-            }).then(function (response) {
-                this.loading = false;
-                var data = response.data;
-                this.filters.bookIndex = data.bookIndex;
-                this.words = data.words;
-                this.books = data.books;
-                this.pageCount = data.pageCount;
-                this.currentPage = parseInt(data.currentPage);
-                this.wordCount = data.wordCount;
-
-                if (this.pageCount - this.currentPage < 3) {
-                    this.paginationLimitBefore += 3 - (this.pageCount - this.currentPage);
-                }
-
-                if (this.currentPage < 4) {
-                    this.paginationLimitAfter += 4 - this.currentPage;
-                }
-
-                if (this.filters.text == 'anytext') {
-                    this.filters.text = '';
-                }
-            }.bind(this)).catch(function (error) {}).then(function () {});
+            this.loadVocabularySearchPage();
         },
         methods: {
+            loadVocabularySearchPage() {
+                axios.post('/vocabulary/search', {
+                    text: (this.filters.text == '') ? 'anytext' : this.filters.text,
+                    book: parseInt(this.filters.book),
+                    chapter: parseInt(this.filters.chapter),
+                    stage: parseInt(this.filters.stage),
+                    translation: this.filters.translation,
+                    phrases: this.filters.phrases,
+                    orderBy: this.filters.orderBy,
+                    page: this.currentPage,
+                }).then((response) => {
+                    this.loading = false;
+                    var data = response.data;
+                    this.filters.bookIndex = data.bookIndex;
+                    this.words = data.words;
+                    this.books = data.books;
+                    this.pageCount = data.pageCount;
+                    this.currentPage = parseInt(data.currentPage);
+                    this.wordCount = data.wordCount;
+                    this.languageSpaces = data.languageSpaces;
+
+                    if (this.pageCount - this.currentPage < 3) {
+                        this.paginationLimitBefore += 3 - (this.pageCount - this.currentPage);
+                    }
+
+                    if (this.currentPage < 4) {
+                        this.paginationLimitAfter += 4 - this.currentPage;
+                    }
+
+                    if (this.filters.text == 'anytext') {
+                        this.filters.text = '';
+                    }
+                });
+            },
             openExportDialog() {
                 this.vocabularyExportDialog.active = true;
+            },
+            openImportDialog() {
+                this.vocabularyImportDialog.active = true;
             },
             exportToCsv(fields) {
                 var text = 'anytext';
@@ -384,9 +407,9 @@
                 axios.post('/vocabulary/export-to-csv', {
                     fields: fields,
                     text: text,
-                    stage: this.filters.stage,
-                    book: this.filters.book,
-                    chapter: this.filters.chapter,
+                    stage: parseInt(this.filters.stage),
+                    book: parseInt(this.filters.book),
+                    chapter: parseInt(this.filters.chapter),
                     translation: this.filters.translation,
                     phrases: this.filters.phrases,
                     orderBy: this.filters.orderBy
@@ -420,7 +443,7 @@
                 }
 
                 if (filter == 'book') {
-                    this.filters.chapter = 'any';
+                    this.filters.chapter = -1;
                     this.filters.bookIndex = newBookIndex;
                 }
                 

@@ -7,9 +7,8 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 use League\Csv\Reader;
-use \Exception;
 use \DeepL\Translator;
 use App\Models\Dictionary;
 use App\Models\ImportedDictionary;
@@ -17,6 +16,7 @@ use App\Models\VocabularyJmdict;
 use App\Models\DeeplCache;
 use App\Models\Setting;
 use App\Services\DictionaryImportService;
+
 
 class DictionaryController extends Controller
 {
@@ -30,7 +30,11 @@ class DictionaryController extends Controller
             if ($dictionary->database_table_name == 'API') {
                 $dictionary->records = '-';
             } else {
-                $dictionary->records = DB::table($dictionary->database_table_name)->selectRaw('count(*) as record_count')->get();
+                $dictionary->records = DB
+                    ::table($dictionary->database_table_name)
+                    ->selectRaw('count(*) as record_count')
+                    ->get();
+
                 $dictionary->records = $dictionary->records[0]->record_count;
             }
         }
@@ -38,21 +42,78 @@ class DictionaryController extends Controller
         return json_encode($dictionaries);
     }
 
-    /*
-        This function updates a dictionary's color and enabled status.
-    */
+    public function getDictionary($dictionaryId) {
+        $dictionary = Dictionary
+            ::where('id', $dictionaryId)
+            ->first();
+
+        if ($dictionary->database_table_name == 'API') {
+            $dictionary->records = '-';
+        } else {
+            $dictionary->records = DB
+                ::table($dictionary->database_table_name)
+                ->selectRaw('count(*) as record_count')
+                ->get();
+
+            $dictionary->records = $dictionary->records[0]->record_count;
+        }
+
+        return json_encode($dictionary);
+    }
+
     public function updateDictionary(Request $request) {
-        $dictionary = Dictionary::where('id', $request->post('id'))->first();
+        $dictionary = Dictionary
+            ::where('id', $request->post('id'))
+            ->first();
 
         if (!$dictionary) {
             return 'error';
         }
 
-        $dictionary->enabled = $request->post('enabled');
-        $dictionary->color = $request->post('color');
+        if (isset($request->name)) {
+            $dictionary->name = $request->post('name');
+        }
+
+        if (isset($request->source_language)) {
+            $dictionary->source_language = $request->post('source_language');
+        }
+
+        if (isset($request->target_language)) {
+            $dictionary->target_language = $request->post('target_language');
+        }
+
+        if (isset($request->color)) {
+            $dictionary->color = $request->post('color');
+        }
+        
+        if (isset($request->enabled)) {
+            $dictionary->enabled = $request->post('enabled');
+        }
+
         $dictionary->save();
 
         return 'success';
+    }
+
+    /*
+        Returns if any DeepL dictionary is enabled for the current user and selected language.
+    */
+    public function isDeeplEnabled() {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $deeplDictionary = Dictionary
+            ::where('name', 'like', 'DeepL%')
+            ->where('enabled', true)
+            ->where('database_table_name','API')
+            ->where('source_language', $language)
+            ->first();
+
+        if (!$deeplDictionary) {
+            return response()->json(false, 200);
+        }
+        
+        return response()->json(true, 200);
     }
 
     /*
@@ -89,7 +150,7 @@ class DictionaryController extends Controller
         $searchResultDictionaries = [];
         $dictionaries = Dictionary
             ::where('enabled', true)
-            ->where('language', $language)
+            ->where('source_language', $language)
             ->get();
 
         // go through each dictionary and search in them
@@ -101,7 +162,7 @@ class DictionaryController extends Controller
             if ($dictionary->name == 'JMDict') {
                 $searchResultDictionary->jmdictRecords = $this->searchJmDict($term);
             } else if (explode(' ', $dictionary->name)[0] == 'DeepL' && $dictionary->database_table_name == 'API') {
-                $searchResultDictionary->records = $this->searchDeepl($language, $term);
+                continue;
             } else {
                 $searchResultDictionary->records = $this->searchImportedDictionary($dictionary->database_table_name, $term);
             }
@@ -113,17 +174,84 @@ class DictionaryController extends Controller
     }
 
     /*
+        This function returns a list of exact matches from dictionaries for the hover popup vocabulary.
+    */
+    public function searchDefinitionsForHoverVocabulary(Request $request) {
+        $language = $request->post('language');
+        $term = $request->post('term');
+        $limit = 15;
+        $searchResults = [];
+        
+        $dictionaries = Dictionary
+            ::where('enabled', true)
+            ->where('source_language', $language)
+            ->get();
+
+        // go through each dictionary and search in them
+        foreach ($dictionaries as $dictionary) {
+            $results = [];
+
+            // make search based on dictionary type
+            if ($dictionary->name == 'JMDict') {
+                $searchRecords = $this->searchJmDict($term, true);
+            } else if ($dictionary->database_table_name == 'API') {
+                // skip dictionary if it's an api
+                continue;
+            } else {
+                $searchRecords = $this->searchImportedDictionary($dictionary->database_table_name, $term, true);
+            }
+
+            // add definitions to the final search results
+            foreach ($searchRecords as $searchRecord) {
+                foreach ($searchRecord->definitions as $definition) {
+                    // break loop if the search result limit is reached
+                    if (count($searchResults) > $limit) {
+                        break;
+                    }
+                    
+                    // add definitions based on dictionary type
+                    if ($dictionary->name == 'JMDict') {
+                        foreach (explode(',', $definition) as $splitDefinition) {
+                            $searchResults[] = $splitDefinition;
+                        }
+                    } else {
+                        $searchResults[] = $definition;
+                    }
+                }
+            }
+        }
+
+        /*
+            Return the found definitions and the search term. Search
+            term must be returned so the client knows which request it.
+        */
+        $result = new \stdClass();
+        $result->term = $term;
+        $result->definitions = array_values(array_unique($searchResults));
+        return json_encode($result);
+    }
+
+    /*
         This function searches a dictionary imported by an admin/user.
     */
-    private function searchImportedDictionary($dictionaryTable, $term) {
+    private function searchImportedDictionary($dictionaryTable, $term, $strict = false) {
         $records = [];
         
-        $dictionaryWords = ImportedDictionary
+        // if strict is true, only return exact matches
+        if ($strict) {
+            $dictionaryWords = ImportedDictionary
             ::fromTable($dictionaryTable)
-            ->where('word', 'LIKE', $term . '%')
-            ->orderByRaw('LENGTH(word)')
+            ->where('word', $term)
             ->limit(40)
             ->get();
+        } else {
+            $dictionaryWords = ImportedDictionary
+                ::fromTable($dictionaryTable)
+                ->where('word', 'LIKE', $term . '%')
+                ->orderByRaw('LENGTH(word)')
+                ->limit(40)
+                ->get();
+        }
 
         foreach ($dictionaryWords as $word) {
             $definitions = explode(';', $word->definitions);
@@ -159,55 +287,83 @@ class DictionaryController extends Controller
         This function sends an API request to DeepL, and returns
         it in a format that can be returned for the client.
     */
-    private function searchDeepl($language, $term) {
+    public function searchDeepl(Request $request) {
+        $language = $request->post('language');
+        $term = $request->post('term');
+
+        $deeplDictionary = Dictionary
+            ::where('name', 'like', 'DeepL%')
+            ->where('enabled', true)
+            ->where('database_table_name','API')
+            ->where('source_language', $language)
+            ->first();
+
+        if (!$deeplDictionary) {
+            return response()->json([
+                'message' => 'DeepL dictionary is disabled.'
+            ], 500);
+        }
+
         // retrieve api key from database
         $apiKeySetting = Setting::where('name', 'deeplApiKey')->first();
         $apiKey = json_decode($apiKeySetting->value);
 
         $hash = md5(mb_strtolower($term, 'UTF-8'));
         $languageCodes = config('linguacafe.languages.deepl_language_codes');
-        $records = [];
 
         // check if search term is already cached
         $cache = DeeplCache
-            ::where('language', $language)
+            ::where('source_language', $language)
+            ->where('target_language', $deeplDictionary->target_language)
             ->where('hash', $hash)
             ->first();
         
         // make api call or retrieve definition from cache
         if ($cache) {
-            $definitions = [$cache->definition];
+            $definition = $cache->definition;
         } else {
             // make api call
             $deepl = new \DeepL\Translator($apiKey);
-            $result = $deepl->translateText($term, $languageCodes[$language], $languageCodes['english']);
-            $definitions = [$result->text];
+
+            // DeepL does not support 'EN-US' for source language 
+            // and 'PT-PT' for language, so I replace them
+            $sourceLanguage = $languageCodes[$language];
+            if ($sourceLanguage === 'EN-US') {
+                $sourceLanguage = 'EN';
+            }
+
+            if ($sourceLanguage === 'PT-PT') {
+                $sourceLanguage = 'PT';
+            }
+
+            $result = $deepl->translateText($term, $sourceLanguage, $languageCodes[$deeplDictionary->target_language]);
+            $definition = $result->text;
 
             // create cache
             $cache = new DeeplCache();
-            $cache->language = $language;
+            $cache->source_language = $language;
+            $cache->target_language = $deeplDictionary->target_language;
             $cache->hash = $hash;
             $cache->definition = $result->text;
             $cache->save();
         }
 
         // return translation
-        $record = new \stdClass();
-        $record->word = $term;
-        $record->definitions = $definitions;
-        $records[] = $record;
+        $result = new \stdClass();
+        $result->term = $term;
+        $result->definition = $definition;
 
-        return $records;
+        return json_encode($result);
     }
 
     /*
         This function searches JMDict, which requires
         custom search function.
     */
-    private function searchJmDict($term) {
+    private function searchJmDict($term, $strict = false) {
         $ids = [];
         // exact word matches
-        $search = VocabularyJmdict::select('id')->whereRelation('words', 'word', 'like', $term)->get()->toArray();
+        $search = VocabularyJmdict::select('id')->whereRelation('words', 'word', $term)->get()->toArray();
         foreach ($search as $result) {
             if (!in_array($result, $ids, true)) {
                 array_push($ids, $result);
@@ -215,26 +371,29 @@ class DictionaryController extends Controller
         }
 
         // exact reading matches
-        $search = VocabularyJmdict::select('id')->whereRelation('readings', 'reading', 'like', $term)->get()->toArray();
+        $search = VocabularyJmdict::select('id')->whereRelation('readings', 'reading', $term)->get()->toArray();
         foreach ($search as $result) {
             if (!in_array($result, $ids, true)) {
                 array_push($ids, $result);
             }
         }
 
-        // partial word matches, max 10
-        $search = VocabularyJmdict::select('id')->whereRelation('words', 'word', 'like', $term . '%')->get()->toArray();
-        foreach ($search as $result) {
-            if (!in_array($result, $ids, true) && count($ids) < 10) {
-                array_push($ids, $result);
+        // if strict is true, do not return partial matches
+        if (!$strict) {
+            // partial word matches, max 10
+            $search = VocabularyJmdict::select('id')->whereRelation('words', 'word', 'like', $term . '%')->get()->toArray();
+            foreach ($search as $result) {
+                if (!in_array($result, $ids, true) && count($ids) < 10) {
+                    array_push($ids, $result);
+                }
             }
-        }
 
-        // partial reading matches, max 10
-        $search = VocabularyJmdict::select('id')->whereRelation('readings', 'reading', 'like', $term . '%')->get()->toArray();
-        foreach ($search as $result) {
-            if (!in_array($result, $ids, true) && count($ids) < 10) {
-                array_push($ids, $result);
+            // partial reading matches, max 10
+            $search = VocabularyJmdict::select('id')->whereRelation('readings', 'reading', 'like', $term . '%')->get()->toArray();
+            foreach ($search as $result) {
+                if (!in_array($result, $ids, true) && count($ids) < 10) {
+                    array_push($ids, $result);
+                }
             }
         }
 
@@ -370,11 +529,13 @@ class DictionaryController extends Controller
         Imports a csv file into a custom dictionary database table.
     */
     public function importDictionaryCsvFile(Request $request) {
+        set_time_limit(2400);
         $skipHeader = boolval($request->post('skipHeader') === 'true');
         $delimiter = $request->post('delimiter') === null ? ' ' : $request->post('delimiter');
         $dictionaryName = $request->post('dictionaryName');
         $databaseTableName = $request->post('databaseName');
-        $language = $request->post('language');
+        $sourceLanguage = $request->post('sourceLanguage');
+        $targetLanguage = $request->post('targetLanguage');
         $color = $request->post('color');
 
         if(!preg_match('/^[a-z0-9_]+$/', $databaseTableName)) {
@@ -405,7 +566,8 @@ class DictionaryController extends Controller
         $dictionary = new Dictionary();
         $dictionary->name = $dictionaryName;
         $dictionary->database_table_name = $databaseTableName;
-        $dictionary->language = $language;
+        $dictionary->source_language = $sourceLanguage;
+        $dictionary->target_language = $targetLanguage;
         $dictionary->color = $color;
         $dictionary->enabled = true;
         $dictionary->save();
@@ -457,19 +619,21 @@ class DictionaryController extends Controller
         
         $dictCcLanguageCodes = config('linguacafe.languages.dict_cc_language_codes');
         $databaseLanguageCodes = config('linguacafe.languages.database_name_language_codes');
+        $supportedSourceLanguages = config('linguacafe.languages.supported_languages');
         
         $dictionaryImportService = new DictionaryImportService();
-        $dictionariesFound = $dictionaryImportService->getImportableDictionaryList($dictCcLanguageCodes, $databaseLanguageCodes);
+        $dictionariesFound = $dictionaryImportService->getImportableDictionaryList($supportedSourceLanguages, $dictCcLanguageCodes, $databaseLanguageCodes);
         
         return json_encode($dictionariesFound);
     }
 
     public function importSupportedDictionary(Request $request) {
+        set_time_limit(2400);
         $dictionaryName = $request->post('dictionaryName');
         $dictionaryFileName = $request->post('dictionaryFileName');
-        $dictionaryLanguage = $request->post('dictionaryLanguage');
+        $dictionarySourceLanguage = $request->post('dictionarySourceLanguage');
+        $dictionaryTargetLanguage = $request->post('dictionaryTargetLanguage');
         $dictionaryDatabaseName = $request->post('dictionaryDatabaseName');
-        $dictionaryExpectedRecordCount = $request->post('dictionaryExpectedRecordCount');
 
         // import jmdict files
         if ($dictionaryName == 'JMDict') {
@@ -487,11 +651,11 @@ class DictionaryController extends Controller
             return 'success';
         }
 
-        // import cc cedict file
-        if ($dictionaryName == 'cc-cedict') {
+        // import cc cedict or HanDeDict file
+        if ($dictionaryName == 'cc-cedict' || $dictionaryName == 'HanDeDict') {
             try {
                 $dictionaryImportService = new DictionaryImportService();
-                $dictionaryImportService->importCeDict($dictionaryName, $dictionaryDatabaseName, $dictionaryFileName);
+                $dictionaryImportService->importCeDictOrHanDeDict($dictionaryName, $dictionaryTargetLanguage, $dictionaryDatabaseName, $dictionaryFileName);
             } catch (\Throwable $t) {
                 return 'error';
             } catch (\Exception $e) {
@@ -533,12 +697,13 @@ class DictionaryController extends Controller
         
 
         // import dict cc files
-        if (str_contains($dictionaryName, 'dict cc')) {
+        if (str_contains($dictionaryName, 'dictcc')) {
             try {
                 $dictionaryImportService = new DictionaryImportService();
                 $dictionaryImportService->importDictCc(
                     $dictionaryName, 
-                    $dictionaryLanguage, 
+                    $dictionarySourceLanguage, 
+                    $dictionaryTargetLanguage,
                     $dictionaryFileName, 
                     $dictionaryDatabaseName
                 );
@@ -563,13 +728,13 @@ class DictionaryController extends Controller
             return 'success';
         }
 
-        // import dict cc files
+        // import wiktionary files
         if (str_contains($dictionaryName, 'wiktionary')) {
             try {
                 $dictionaryImportService = new DictionaryImportService();
                 $dictionaryImportService->importWiktionary(
                     $dictionaryName, 
-                    $dictionaryLanguage, 
+                    $dictionarySourceLanguage, 
                     $dictionaryFileName, 
                     $dictionaryDatabaseName
                 );

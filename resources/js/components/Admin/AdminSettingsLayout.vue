@@ -1,0 +1,69 @@
+<template>
+    <v-container>
+        <v-tabs v-model="tab" background-color="white" class="rounded-lg border overflow-hidden" @change="tabChanged">
+            <v-tab>Users</v-tab>
+            <v-tab>Languages</v-tab>
+            <v-tab>Dictionaries</v-tab>
+            <v-tab>API</v-tab>
+            <v-tab>Reviews</v-tab>
+        </v-tabs>
+        <v-tabs-items v-model="tab" id="admin-tab-items" elevation="0" class="rounded-lg mt-4 pa-6">
+            <v-tab-item :value="0">
+                <admin-user-settings></admin-user-settings>
+            </v-tab-item>
+            <v-tab-item :value="1">
+                <admin-language-settings></admin-language-settings>
+            </v-tab-item>
+            <v-tab-item :value="2">
+                <admin-dictionary-settings :language="$props.language"></admin-dictionary-settings>
+            </v-tab-item>
+            <v-tab-item :value="3">
+                <admin-api-settings></admin-api-settings>
+            </v-tab-item>
+            <v-tab-item :value="4">
+                <admin-review-settings></admin-review-settings>
+            </v-tab-item>
+        </v-tabs-items>
+    </v-container>
+</template>
+
+<script>
+    export default {
+        data: function() {
+            return {
+                tab: 0,
+                tabIndexes: {
+                    'users': 0,
+                    'languages': 1,
+                    'dictionaries': 2,
+                    'api': 3,
+                    'reviews': 4,
+                },
+                tabUrls: [
+                    'users',
+                    'languages',
+                    'dictionaries',
+                    'api',
+                    'reviews',
+                ]
+            }
+        },
+        props: {
+            language: String
+        },
+        mounted() {
+            if (this.$route.params.page !== undefined) {
+                this.tab = this.tabIndexes[this.$route.params.page];
+            } 
+        },
+        methods: {
+            tabChanged(event) {
+                var page = this.tabUrls[event];
+
+                if (this.$router.currentRoute.fullPath !== '/admin/' + page) {
+                    this.$router.push('/admin/' + page);
+                }
+            }
+        }
+    }
+</script>

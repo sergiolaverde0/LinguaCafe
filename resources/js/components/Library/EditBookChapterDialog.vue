@@ -1,5 +1,5 @@
 <template>
-    <v-dialog v-model="value" persistent width="800px">
+    <v-dialog v-model="value" persistent width="800px" @keydown.enter.prevent="enterPressed">
         <v-card class="rounded-lg">
             <!-- Card title -->
             <v-card-title>
@@ -24,11 +24,13 @@
                 <v-form ref="editChapterForm" v-if="!loading">
                     <label class="font-weight-bold mt-2">Name</label>
                     <v-text-field 
+                        ref="chapterName"
                         filled
                         dense
                         rounded
                         v-model="name"
                         :rules="[rules.chapterName]"
+                        :disabled="type !== 'text' || loading"
                     ></v-text-field>
                     
                     <label class="font-weight-bold mt-2">Text</label>
@@ -39,8 +41,9 @@
                         rounded
                         no-resize
                         height="300px"
-                        maxlength="10000"
-                        counter="10000"
+                        maxlength="15000"
+                        counter="15000"
+                        :disabled="type !== 'text' || loading"
                     ></v-textarea>
                     
                     <!-- Save result alerts -->
@@ -61,6 +64,16 @@
                     >
                         Chapter has been saved successfully.
                     </v-alert>
+
+                    <!-- Subtitle editing is not enabled alert -->
+                    <v-alert
+                        v-if="type !== 'text'"
+                        class="my-3" 
+                        border="left"
+                        type="error"
+                    >
+                        You cannot edit subtitles yet, it will be implemented in a future update.
+                    </v-alert>
                 </v-form>
             </v-card-text>
 
@@ -74,7 +87,7 @@
                     depressed
                     color="primary" 
                     @click="save"
-                    :disabled="!isFormValid || saving || saveResult == 'success'"
+                    :disabled="!isFormValid || saving || saveResult == 'success' || type !== 'text'"
                     :loading="saving"
                 >
                     Save
@@ -110,6 +123,7 @@
                 },
                 name: '',
                 text: '',
+                type: 'text',
             }
         },
         props: {
@@ -122,6 +136,11 @@
             this.loadChapter();
         },
         methods: {
+            enterPressed() {
+                if (this.$refs.editChapterForm.validate()) {
+                    this.save();
+                }
+            },
             save() {
                 this.saveResult = '';
                 if (!this.$refs.editChapterForm.validate()) {
@@ -129,18 +148,22 @@
                 }
 
                 this.saving = true;
+                var url = '/chapters/update';
                 var data = {
-                    'name': this.name,
-                    'raw_text': this.text,
-                    'book': this.$props.bookId
+                    'chapterName': this.name,
+                    'chapterText': this.text,
                 };
 
                 if (this.$props.chapterId !== -1) {
-                    data.lesson_id = this.$props.chapterId;
+                    data.chapterId = this.$props.chapterId;
+                } else {
+                    data.bookId = this.$props.bookId;
+                    url = '/chapters/create';
                 }
                 
-                axios.post('/chapter/save', data).then((response) => {
-                    if (response.data == 'success') {
+                axios.post(url, data).then((response) => {
+                    this.saving = false;
+                    if (response.status === 200) {
                         this.saveResult = 'success';
 
                         setTimeout(() => {
@@ -153,24 +176,28 @@
                 }).catch((error) => {
                     this.saving = false;
                     this.saveResult = 'error';
-                }).then(() =>{
-                    this.saving = false;
                 });
             },
             loadChapter() {
                 if (this.$props.chapterId !== -1) {
-                    axios.get('/chapter/get/edit/' + this.$props.chapterId).then((response) => {
+                    axios.post('/chapters/get/editor', {
+                        chapterId: this.$props.chapterId,
+                    }).then((response) => {
                         this.name = response.data.name;
                         this.text = response.data.raw_text;
+                        this.type = response.data.type;
                         this.loading = false;
                         this.$nextTick(() => {
                             this.$refs.editChapterForm.validate();
+
+                            this.$refs.chapterName.focus();
                         });
                     });
                 } else {
                     this.loading = false;
                     this.$nextTick(() => {
                         this.$refs.editChapterForm.validate();
+                        this.$refs.chapterName.focus();
                     });
                 }
             },

@@ -35,7 +35,7 @@ class TextBlock
     /*
         This variable contains raw untokenized text. 
     */
-    public $rawText = "";
+    public $rawText = '';
 
     /*
         This variable contains unprocessed tokenized words coming from 
@@ -65,8 +65,12 @@ class TextBlock
     public $uniqueWords = [];
     public $phrases = [];
 
+    // stores the python service container's name
+    private $pythonService;
+
     function __construct() {
         $this->language = Auth::user()->selected_language;
+        $this->pythonService = env('PYTHON_CONTAINER_NAME', 'linguacafe-python-service');
     }
 
     /* 
@@ -76,7 +80,7 @@ class TextBlock
     public function setProcessedWords($processedWords) {
         $this->processedWords = $processedWords;
 
-        if (gettype($processedWords[0]->phrase_ids) == 'string') {
+        if (count($processedWords) > 0 && gettype($processedWords[0]->phrase_ids) == 'string') {
             foreach ($this->processedWords as $word) {
                 $word->phrase_ids = json_decode($word->phrase_ids);
             }
@@ -99,25 +103,24 @@ class TextBlock
         return $wordCount;
     }
 
-    /* 
-        Sends the raw text to python tokenizer service, and stores the result.
-    */
-    public function tokenizeRawText() {
-        $this->tokenizedWords = Http::post('linguacafe-python-service:8678/tokenizer/', [
-            'raw_text' => preg_replace("/ {2,}/", " ", str_replace(["\r\n", "\r", "\n"], " NEWLINE ", $this->rawText)),
-            'language' => $this->language,
-        ]);
+    private function preProcessText() {
+        $text = $this->rawText;
+        $text = preg_replace("/ {2,}/", " ", str_replace(["\r\n", "\r", "\n"], " NEWLINE ", $text));
 
-        $this->tokenizedWords = json_decode($this->tokenizedWords);
+        if ($this->language === 'thai') {
+            $text = str_replace(' ', ' THAINEWSENTENCE ', $text);
+        }
+
+        return $text;
     }
 
     /* 
         Sends the raw text to python tokenizer service, and stores the result.
     */
-    public function fastTokenizeRawText() {
-        $this->tokenizedWords = Http::post('linguacafe-python-service:8678/tokenizer/import-book', [
-            'raw_text' => $this->rawText,
-            'language' => $this->language
+    public function tokenizeRawText() {
+        $this->tokenizedWords = Http::post($this->pythonService . ':8678/tokenizer', [
+            'raw_text' => $this->preProcessText(),
+            'language' => $this->language,
         ]);
 
         $this->tokenizedWords = json_decode($this->tokenizedWords);
@@ -134,7 +137,8 @@ class TextBlock
             $replacedTexts[] = preg_replace("/ {2,}/", " ", str_replace(["\r\n", "\r", "\n"], " NEWLINE ", $text));
         }
 
-        $tokenizedTextArray = Http::post('linguacafe-python-service:8678/tokenizer/', [
+        $pythonService = env('PYTHON_CONTAINER_NAME', 'linguacafe-python-service');
+        $tokenizedTextArray = Http::post($pythonService . ':8678/tokenizer', [
             'raw_text' => $replacedTexts,
             'language' => $language
         ]);
@@ -155,6 +159,7 @@ class TextBlock
         $processedWordCount = 0;
         $wordCount = count($this->tokenizedWords);
 
+        $thaiSentenceIndex = 0;
         for ($wordIndex = 0; $wordIndex < $wordCount; $wordIndex++) {
             $word = new \stdClass();
             $word->user_id = $userId;
@@ -169,6 +174,7 @@ class TextBlock
                 $word->reading = '';
                 $word->lemma_reading = '';
             }
+            
             $word->pos = $this->tokenizedWords[$wordIndex]->pos;
             $word->phrase_ids = [];
 
@@ -204,6 +210,18 @@ class TextBlock
                             $wordIndex --; break;
                         }
                     } while($this->tokenizedWords[$wordIndex]->pos == 'SCONJ' && $wordIndex < $wordCount - 1);
+                }
+            }
+
+            // thai post processing
+            if ($this->language == 'thai') { 
+                if ($word->word == 'NEWLINE') {
+                    $thaiSentenceIndex ++;
+                } else if ($word->word == 'THAINEWSENTENCE') {
+                    $thaiSentenceIndex ++;
+                    continue;
+                } else {
+                    $word->sentence_index = $thaiSentenceIndex;
                 }
             }
 
@@ -274,6 +292,9 @@ class TextBlock
         encounters for the first time.
     */
     public function createNewEncounteredWords() {
+        $wordsToSkip = config('linguacafe.words_to_skip');      
+        $wordCount = 0;
+
         // a regular expression for japanese kanji characters
         $kanjipattern = "/[a-zA-Z0-9０-９あ-んア-ンー。、:？！＜＞： 「」（）｛｝≪≫〈〉《》【】『』〔〕［］・\n\r\t\s\(\)　]/u";
         DB::disableQueryLog();
@@ -289,36 +310,48 @@ class TextBlock
         $encounteredWordsToInsert = [];
         for ($wordIndex = 0; $wordIndex < count($this->processedWords); $wordIndex ++) {
             if (
-                !in_array(mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8'), $encounteredWords, true) &&
-                $this->processedWords[$wordIndex]->word !== 'NEWLINE'
+                in_array(mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8'), $encounteredWords, true) ||
+                $this->processedWords[$wordIndex]->word === 'NEWLINE'
             ){
-                $encounteredWords[] = mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8');
-                
-                if ($this->language == 'japanese' || $this->language == 'chinese') {
-                    $kanji = preg_replace($kanjipattern, "", $this->processedWords[$wordIndex]->word);
-                    $kanji = preg_split("//u", $kanji, -1, PREG_SPLIT_NO_EMPTY);
-                }
-
-                $encounteredWord = [];
-                $encounteredWord['user_id'] = Auth::user()->id;
-                $encounteredWord['language'] = $this->language;
-                $encounteredWord['word'] = mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8');
-                $encounteredWord['lemma'] = mb_strtolower($this->processedWords[$wordIndex]->lemma);
-                $encounteredWord['base_word'] = mb_strtolower($this->processedWords[$wordIndex]->lemma);
-                $encounteredWord['kanji'] = $this->language == 'japanese' || $this->language == 'chinese' ? implode('', $kanji) : '';
-                $encounteredWord['reading'] = $this->processedWords[$wordIndex]->reading;
-                $encounteredWord['base_word_reading'] = $this->processedWords[$wordIndex]->lemma_reading;
-                $encounteredWord['example_sentence'] = '';
-                $encounteredWord['stage'] = 2;
-                $encounteredWord['translation'] = '';
-
-                if ($encounteredWord['base_word'] == $encounteredWord['word']) {
-                    $encounteredWord['base_word'] = '';
-                    $encounteredWord['base_word_reading'] = '';
-                }
-
-                $encounteredWordsToInsert[] = $encounteredWord;
+                continue;
             }
+
+            $encounteredWords[] = mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8');
+            
+            if ($this->language == 'japanese' || $this->language == 'chinese') {
+                $kanji = preg_replace($kanjipattern, "", $this->processedWords[$wordIndex]->word);
+                $kanji = preg_split("//u", $kanji, -1, PREG_SPLIT_NO_EMPTY);
+            }
+
+            $encounteredWord = [];
+            $encounteredWord['user_id'] = Auth::user()->id;
+            $encounteredWord['language'] = $this->language;
+            $encounteredWord['word'] = mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8');
+            $encounteredWord['lemma'] = mb_strtolower($this->processedWords[$wordIndex]->lemma);
+            $encounteredWord['base_word'] = mb_strtolower($this->processedWords[$wordIndex]->lemma);
+            $encounteredWord['kanji'] = $this->language == 'japanese' || $this->language == 'chinese' ? implode('', $kanji) : '';
+            $encounteredWord['reading'] = $this->processedWords[$wordIndex]->reading;
+            $encounteredWord['base_word_reading'] = $this->processedWords[$wordIndex]->lemma_reading;
+            $encounteredWord['example_sentence'] = '';
+            $encounteredWord['stage'] = 2;
+            $encounteredWord['translation'] = '';
+
+            
+            if (in_array($this->processedWords[$wordIndex]->word, $wordsToSkip, true) || is_numeric($this->processedWords[$wordIndex]->word)) {
+                $encounteredWord['stage'] = 1;
+                $encounteredWord['base_word'] = '';
+                $encounteredWord['lemma'] = '';
+                $encounteredWord['reading'] = '';
+                $encounteredWord['base_word_reading'] = '';
+            }
+
+            if ($encounteredWord['base_word'] == $encounteredWord['word']) {
+                $encounteredWord['base_word'] = '';
+                $encounteredWord['lemma'] = '';
+                $encounteredWord['base_word_reading'] = '';
+            }
+
+            $encounteredWordsToInsert[] = $encounteredWord;
         }
 
         DB::table('encountered_words')->insert($encounteredWordsToInsert);
@@ -473,6 +506,7 @@ class TextBlock
     public function prepareTextForReader() {
         $tokensWithNoSpaceBefore = config('linguacafe.tokens_with_no_space_before');
         $tokensWithNoSpaceAfter = config('linguacafe.tokens_with_no_space_after');
+        $languagesWithoutSpaces = config('linguacafe.languages.languages_without_spaces');
 
         $this->words = [];
         $encounteredWords = DB::table('encountered_words')
@@ -481,7 +515,8 @@ class TextBlock
             ->whereIn('word', $this->uniqueWords)
             ->get();
 
-        for ($wordIndex = 0; $wordIndex < count($this->processedWords); $wordIndex ++) {
+        $wordCount = count($this->processedWords);
+        for ($wordIndex = 0; $wordIndex < $wordCount; $wordIndex ++) {
             // make the word into an object
             $word = $this->processedWords[$wordIndex];
             $word->selected = false;
@@ -490,10 +525,19 @@ class TextBlock
             $word->phraseStart = false;
             $word->phraseEnd = false;
             $word->phraseIndexes = [];
+            $word->subtitleIndex = -1;
             
             
             // Add space for word if the language has spaces in it.
-            $word->spaceAfter = ($this->language !== 'japanese' && $this->language !== 'chinese');
+            if ($this->language == 'thai') {
+                $word->spaceAfter = (
+                    isset($this->processedWords[$wordIndex]->sentence_index) &&
+                    $wordIndex < $wordCount - 1 && 
+                    $this->processedWords[$wordIndex + 1]->sentence_index !== $this->processedWords[$wordIndex]->sentence_index
+                );
+            } else {
+                $word->spaceAfter = !in_array($this->language, $languagesWithoutSpaces, true);
+            }
             
             if ($wordIndex < count($this->processedWords) - 1 && in_array($this->processedWords[$wordIndex + 1]->word, $tokensWithNoSpaceBefore, true)) {
                     $word->spaceAfter = false;
@@ -510,6 +554,7 @@ class TextBlock
 
             $word->stage = $encounteredWords[$wordId]->stage;
             $word->lookup_count = $encounteredWords[$wordId]->lookup_count;
+            $word->furigana = $encounteredWords[$wordId]->reading;
 
             $this->words[] = $word;
         }

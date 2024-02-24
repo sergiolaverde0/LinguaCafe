@@ -1,32 +1,38 @@
 version: '3'
-name: linguacafe
+name: linguacafedev
 
 networks:
-    linguacafe:
+    linguacafedev:
         driver: bridge
 
 services:
     webserver:
-        container_name: linguacafe-webserver
+        container_name: linguacafe-webserver-dev
+        restart: unless-stopped
         build:
             context: .
             dockerfile: ./docker/PhpDockerfileDev
         depends_on:
-            mysql:
-                condition: service_healthy
+            - mysql
         volumes:
             - ./:/var/www/html
             - ./docker/vhost.conf:/etc/apache2/sites-available/000-default.conf
+        environment:
+            PYTHON_CONTAINER_NAME: linguacafe-python-service-dev
+            DB_DATABASE: linguacafe-dev
+            DB_USERNAME: linguacafe-dev
+            DB_PASSWORD: linguacafe-dev
+            DB_HOST: linguacafe-database-dev
         ports:
             - "3000:3000"
             - "81:80"
         networks:
-            - linguacafe
+            - linguacafedev
         extra_hosts:
             - "host.docker.internal:host-gateway"
     mysql:
         image: mysql:8.0
-        container_name: linguacafe-database
+        container_name: linguacafe-database-dev
         restart: unless-stopped
         tty: true
         ports:
@@ -34,27 +40,26 @@ services:
         volumes:
           - ./docker/mysql:/var/lib/mysql
         environment:
-          MYSQL_DATABASE: linguacafe
-          MYSQL_USER: linguacafe
-          MYSQL_PASSWORD: linguacafe
-          MYSQL_ROOT_PASSWORD: linguacafe
-          SERVICE_NAME: linguacafe
-        healthcheck:
-            test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-            interval: 5s
-            timeout: 5s
-            retries: 3
+            MYSQL_DATABASE: linguacafe-dev
+            MYSQL_USER: linguacafe-dev
+            MYSQL_PASSWORD: linguacafe-dev
+            MYSQL_ROOT_PASSWORD: linguacafe-dev
+            SERVICE_NAME: linguacafe-dev
         networks:
-            - linguacafe
+            - linguacafedev
     python:
-        container_name: linguacafe-python-service
-        command: /app/manage.py runserver 0.0.0.0:8678
+        container_name: linguacafe-python-service-dev 
+        command: "python3 /app/tokenizer.py"
         restart: unless-stopped
         tty: true
+        ports: 
+            - "8678:8678"
         build:
             dockerfile: ./docker/PythonDockerfileDev
         volumes:
-            - ./tools/django_server:/app
+            - ./tools:/app
             - ./storage/app:/var/www/html/storage/app
         networks:
-            - linguacafe
+            - linguacafedev
+        environment:
+            PYTHONPATH: "/var/www/html/storage/app/model"

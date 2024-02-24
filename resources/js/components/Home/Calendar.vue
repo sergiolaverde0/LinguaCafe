@@ -93,7 +93,7 @@
                             <v-simple-table dense class="no-row-border no-hover">
                                 <tbody>
                                     <tr>
-                                        <td>Reviewes due:</td>
+                                        <td>Reviews due:</td>
                                         <td>{{ popupMenu.day.reviewsDue }}</td>
                                     </tr>
                                     <tr v-for="(achievement, index) in popupMenu.achievements" :key="index">
@@ -143,7 +143,7 @@
                                 'calendar-day': true, 
                                 'no-achievement': (selectedGoal == 'reviews_due' && !day.reviewsDue) || (selectedGoal !== 'reviews_due' && (day.achievement == null || day.achievement.achievedQuantity == 0)),
                                 'half-achievement': selectedGoal !== 'reviews_due' && day.achievement !== null && day.achievement.achievedQuantity < day.achievement.goalQuantity,
-                                'full-achievement': (selectedGoal == 'reviews_due' && day.reviewsDue) || (selectedGoal !== 'reviews_due' && day.achievement !== null && day.achievement.achievedQuantity >= day.achievement.goalQuantity),
+                                'full-achievement': (selectedGoal == 'reviews_due' && day.reviewsDue) || (selectedGoal !== 'reviews_due' && day.achievement !== null && day.achievement.achievedQuantity >= day.achievement.goalQuantity && day.achievement.goalQuantity !== 0),
                             }"
                             transition="fade-transition"
                             @click.stop="openCalendarDayPopup($event, day)"

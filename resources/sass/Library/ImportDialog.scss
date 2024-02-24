@@ -1,6 +1,75 @@
 @import './../variables';
 
 #import-dialog {
+
+    #website-text {
+        background-color: var(--v-gray3-base);
+        color: var(--v-text-base);
+    }
+
+    #website-import-input {
+        min-height: calc(100vh - 500px);
+    }
+
+    .plain-text-source {
+        height: 100%;
+
+        #plain-text-import-input {
+            min-height: calc(100vh - 440px);
+        }
+    }
+
+    .jellyfin-subtitle-source {
+        #selected-jellyfin-subtitle {
+            font-size: 16px;
+            line-height: 28px;
+            background-color: var(--v-gray3-base);
+            color: var(--v-text-base);
+        }
+    }
+
+    .website-url-input {
+        width: calc(100% - 108px);
+        margin-right: 8px;
+    }
+
+    .youtube-subtitle-source {
+        position: relative;
+
+        .youtube-url-input {
+            width: calc(100% - 108px);
+            margin-right: 8px;
+        }
+
+        #selected-youtube-subtitle-label {
+            height: 36px;
+            line-height: 38px;
+            margin-bottom: 0px;
+        }
+
+        #selected-youtube-subtitle {
+            font-size: 16px;
+            line-height: 28px;
+            background-color: var(--v-gray3-base);
+            color: var(--v-text-base);
+        }
+
+        #youtube-subtitles {
+            .youtube-subtitle {
+                line-height: 30px;
+                font-size: 16px;
+                cursor: pointer;
+                user-select: none;
+                transition: .2s;
+                padding-top: 11px;
+
+                &:hover {
+                    background-color: var(--v-gray-base);
+                }
+            }
+        }
+    }
+
     .import-type-group {
         display: flex;
         width: 100%;
@@ -70,6 +139,39 @@
             .v-skeleton-loader:nth-child(2) .v-skeleton-loader__card,
             .v-skeleton-loader:nth-child(2) {
                 width: 136px;
+            }
+        }
+    }
+}
+
+@media (max-width: 500px) {
+    .v-stepper__content {
+        padding: 0px !important;
+    }
+
+    .website-url-input {
+        width: 100%;
+        margin-right: 0px;
+    }
+
+    #retrieve-website-button {
+        width: 80%;
+        margin: auto;
+        margin-bottom: 8px;
+    }
+
+    #import-dialog {
+        .youtube-subtitle-source {
+    
+            .youtube-url-input {
+                width: 100%;
+                margin-right: 0px;
+            }
+
+            #retrieve-youtube-button {
+                width: 80%;
+                margin: auto;
+                margin-top: 8px;
             }
         }
     }

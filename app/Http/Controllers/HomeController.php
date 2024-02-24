@@ -3,157 +3,120 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+
 use App\Models\User;
-use App\Models\ExampleSentence;
-use App\Models\EncounteredWord;
-use App\Models\Goal;
-use App\Models\GoalAchievement;
-use App\Models\Phrase;
-use App\Models\Lesson;
-use App\Models\TextBlock;
 use App\Services\GoalService;
+use App\Services\StatisticsService;
 
-class HomeController extends Controller
-{
-    /**
-     * Create a new controller instance.
-     *
-     * @return void
-     */
+// request classes
+use App\Http\Requests\Home\GetConfigRequest;
 
-    public function __construct()
-    {
-        $this->middleware('auth');
-    }
-
-    public function dev() {
-        // $lessons = Lesson::get();
-        // $lessonCount = count($lessons);
-        // foreach ($lessons as $lessonIndex => $lesson) {
-        //     $textBlock = new TextBlock();
-        //     $textBlock->rawText = $lesson->raw_text;
-        //     $textBlock->tokenizeRawText();
-        //     $textBlock->processTokenizedWords();
-        //     $textBlock->collectUniqueWords();
-        //     $textBlock->updateAllPhraseIds();
-        //     $textBlock->createNewEncounteredWords();
+class HomeController extends Controller {
     
-        //     $uniqueWordIds = DB
-        //         ::table('encountered_words')
-        //         ->select('id')
-        //         ->where('user_id', $lesson->user_id)
-        //         ->where('language', $lesson->language)
-        //         ->whereIn('word', $textBlock->uniqueWords)
-        //         ->pluck('id')
-        //         ->toArray();
-                
-        //     // update lesson word data
-        //     $lesson->word_count = $textBlock->getWordCount();
-        //     $lesson->unique_words = json_encode($textBlock->uniqueWords);
-        //     $lesson->unique_word_ids = json_encode($uniqueWordIds);
-        //     $lesson->setProcessedText($textBlock->processedWords);
-        //     $lesson->save();
+    private $statisticsService;
+    private $goalService;
 
-        //     echo(($lessonIndex + 1) . '/' . $lessonCount . ' finished <br>');
-        //     echo str_repeat(' ',1024*64);
-        //     flush();
-        // }
+    public function __construct(StatisticsService $statisticsService, GoalService $goalService) {
+        $this->middleware('auth');
+
+        $this->statisticsService = $statisticsService;
+        $this->goalService = $goalService;
     }
 
-
-    /**
-     * Show the application dashboard.
-     *
-     * @return \Illuminate\Contracts\Support\Renderable
-     */
     public function index() {
         $selectedLanguage = Auth::user()->selected_language;
         $userCount = User::count();
+        $userName = Auth::user()->name;
         $theme = $_COOKIE['theme'] ?? 'light';
         
         return view('home', [
             'language' => $selectedLanguage,
             'userCount' => $userCount,
+            'userName' => $userName,
             'theme' => $theme
         ]);
     }
 
     public function getStatistics() {
-        // language statistics
-        $today = date('Y-m-d');
-        $selectedLanguage = Auth::user()->selected_language;
-        $languageStatistics = new \stdClass();
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
 
-        $readingGoal = Goal::where('user_id', Auth::user()->id)
-            ->where('language', $selectedLanguage)
-            ->where('type', 'read_words')
-            ->first();
+        try {
+            $statistics = $this->statisticsService->getStatistics($userId, $language);
+        } catch (\Exception $e) {
+            abort(500, $e->getMessage());
+        }
 
-        $languageStatistics->days = new \stdClass();
-        $languageStatistics->days->name = 'Days of activity';
-        $languageStatistics->days->value = GoalAchievement::where('user_id', Auth::user()->id)->where('language', $selectedLanguage)->where('achieved_quantity', '<>', 0)->distinct('day')->count('day');
-        $languageStatistics->days->color = 'statisticsDays';
-        $languageStatistics->days->icon = 'mdi-calendar-check';
+        return response()->json($statistics, 200);
+    }
 
-        $languageStatistics->readWordCount = new \stdClass();
-        $languageStatistics->readWordCount->name = 'Read words';
-        $languageStatistics->readWordCount->value = GoalAchievement::where('user_id', Auth::user()->id)->where('language', $selectedLanguage)->where('goal_id', $readingGoal->id)->sum('achieved_quantity');
-        $languageStatistics->readWordCount->color = 'statisticsReadWords';
-        $languageStatistics->readWordCount->icon = 'mdi-book-open-variant';
+    public function getConfig($configPath, GetConfigRequest $request) {
+        if (!config()->has($configPath)) {
+            abort(500, 'Requested config value does not exist.');
+        }
 
-        if ($selectedLanguage == 'japanese') {
-            // get unique kanji
-            $uniqueKanji = [];
-            $words = EncounteredWord::where('stage', '<=', 0)->where('language', 'japanese')->where('user_id', Auth::user()->id)->get();
-            foreach ($words as $word) {
-                $kanji = preg_split("//u", $word->kanji, -1, PREG_SPLIT_NO_EMPTY);
-                foreach($kanji as $currentKanji) {
-                    if(!in_array($currentKanji, $uniqueKanji, true)) {
-                        array_push($uniqueKanji, $currentKanji);
+        $config = config($configPath);
+        return response()->json($config, 200);
+    }
+
+    public function getUserManualTree() {
+        $manualTree = [];
+        
+        $path = public_path('./../manual/');
+        $files = scandir($path);
+
+        $index = 0;
+        foreach ($files as $file) {
+            // skip
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+
+            // create page;
+            $page = new \stdClass();
+            $page->id = $index;
+            $page->name = str_replace('.md', '', $file);
+            $page->fileName = str_replace('.md', '', $file);
+            $page->level = 0;
+            $index ++;
+
+            // get subpages
+            $subPages = [];
+            $handle = fopen('./../manual/' . $file, "r");
+            if ($handle) {
+                while (($line = fgets($handle)) !== false) {
+                    // if line starts with "# "
+                    if (strpos($line, '# ') === 0) {
+                        $subPageName = substr($line, 2);
+                        $subPageName = str_replace("\r\n", '', $subPageName);
+                        $subPageName = str_replace("\n", '', $subPageName);
+                        $subPageName = str_replace("\n", '', $subPageName);
+                        
+                        $subPage = new \stdClass();
+                        $subPage->id = $index;
+                        $subPage->name = $subPageName;
+                        $subPage->fileName = str_replace('.md', '', $file) . '#' . $subPageName;
+                        $subPage->level = 1;
+                        $subPages[] = $subPage;
+                        $index ++;
                     }
                 }
+            
+                fclose($handle);
             }
             
-            $languageStatistics->kanji = new \stdClass();
-            $languageStatistics->kanji->name = 'Kanji';
-            $languageStatistics->kanji->value = count($uniqueKanji);
-            $languageStatistics->kanji->color = 'statisticsKanji';
-            $languageStatistics->kanji->icon = 'mdi-ideogram-cjk';
+            if (count($subPages)) {
+                $page->children = $subPages;
+            }
+
+            $manualTree[] = $page;
         }
-        
-        $languageStatistics->known = new \stdClass();
-        $languageStatistics->known->name = 'Known words';
-        $languageStatistics->known->value = EncounteredWord::select('id')->where('stage', 0)->where('user_id', Auth::user()->id)->where('language', $selectedLanguage)->count('id');
-        $languageStatistics->known->color = 'statisticsKnownWords';
-        $languageStatistics->known->icon = 'mdi-credit-card-check';
 
-        $languageStatistics->learning = new \stdClass();
-        $languageStatistics->learning->name = 'Words currently studied';
-        $languageStatistics->learning->value = EncounteredWord::select('id')->where('stage', '<', 0)->where('user_id', Auth::user()->id)->where('language', $selectedLanguage)->count('id');
-        $languageStatistics->learning->color = 'statisticsLearningWords';
-        $languageStatistics->learning->icon = 'mdi-school';
-        
-        return json_encode($languageStatistics);
+        return response()->json($manualTree, 200);
     }
 
-    public function getLanguage() {
-        return Auth::user()->selected_language;
-    }
-
-    public function changeLanguage($language) {
-        $user = Auth::user();
-        $user->selected_language = strtolower($language);
-        $user->save();
-
-        (new GoalService())->createGoalsForLanguage($user->id, $language);
-    }
-
-    public function getConfig($configPath) {
-        $config = config($configPath);
-
-        return json_encode($config);
+    public function getUserManualFile($fileName) {
+        return response()->file('./../manual/' . $fileName . '.md');
     }
 }

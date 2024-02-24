@@ -92,6 +92,7 @@
                     ></v-text-field>
 
                     <v-text-field 
+                        v-if="['chinese', 'japanese'].includes($props.language)"
                         v-model="item.base_word_reading"
                         @keyup="changed"
                         filled
@@ -104,7 +105,7 @@
                 <!-- Arrows -->
                 <div id="vocabulary-edit-middle" v-if="$props.itemType == 'Word'">
                     <div class="arrow pt-2 text-center"><v-icon large>mdi-arrow-right</v-icon></div>
-                    <div class="arrow pt-2 text-center"><v-icon large>mdi-arrow-right</v-icon></div>
+                    <div class="arrow pt-2 text-center" v-if="['chinese', 'japanese'].includes($props.language)"><v-icon large>mdi-arrow-right</v-icon></div>
                 </div>
 
                 <!-- Word -->
@@ -131,6 +132,7 @@
                     ></v-text-field>
 
                     <v-text-field 
+                    v-if="['chinese', 'japanese'].includes($props.language)"
                         v-model="item.reading"
                         @keyup="changed"
                         filled
@@ -207,7 +209,8 @@
                 type: String,
                 default: 'Word'
             },
-            language: String
+            language: String,
+            languageSpaces: Boolean,
         },
         emits: ['input'],
         data: function() {
@@ -219,15 +222,15 @@
             };
         },
         mounted: function() {
-            axios.get('/vocabulary/' + this.$props.itemType.toLowerCase() + '/get/' + this.$props.itemId).then((response) => {
+            axios.get('/vocabulary/' + this.$props.itemType.toLowerCase() + 's/get/' + this.$props.itemId).then((response) => {
                 this.loading = false;
                 this.item = response.data;
                 
                 if (this.$props.itemType == 'Phrase') {
-                    if (this.$props.language == 'japanese' || this.$props.language == 'chinese') {
-                        this.item.words = JSON.parse(this.item.words).join('');
-                    } else {
+                    if (this.$props.languageSpaces) {
                         this.item.words = JSON.parse(this.item.words).join(' ');
+                    } else {
+                        this.item.words = JSON.parse(this.item.words).join('');
                     }
                 }
             });
@@ -259,10 +262,10 @@
                     stage: this.item.stage,
                 };
 
-                axios.post('/vocabulary/word/save', saveData).then(() => {
+                axios.post('/vocabulary/word/update', saveData).then(() => {
                     this.saved = true;
                     this.saving = false;
-                    this.close();
+                    this.updateVocabularySearch();
                 });
             },
             savePhrase: function(withStage = false, exampleSentenceChanged = false) {                
@@ -273,16 +276,20 @@
                     stage: this.item.stage
                 };
 
-                axios.post('/vocabulary/phrase/save', saveData).then(() => {
+                axios.post('/vocabulary/phrases/update', saveData).then(() => {
                     this.saved = true;
                     this.saving = false;
-                    this.close();
+                    this.updateVocabularySearch();
                 });
             },
             changed: function() {
                 this.saved = false;
             },
             close: function() {
+                this.$emit('input', false);
+            },
+            updateVocabularySearch: function() {
+                this.$emit('saved');
                 this.$emit('input', false);
             }
         }

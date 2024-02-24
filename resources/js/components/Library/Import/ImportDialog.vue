@@ -1,5 +1,5 @@
 <template>
-    <v-dialog v-model="value" persistent width="1000px">
+    <v-dialog v-model="value" scrollable persistent width="1000px" @keydown.enter.prevent="enterPressed">
         <v-card id="import-dialog" class="rounded-lg" :loading="importLoading">
             <!-- Card title -->
             <v-card-title>
@@ -13,17 +13,17 @@
             
             <!-- Import form -->
             <v-card-text>
-                <v-stepper id="import-stepper" v-model="stepperPage" elevation="0" class="pb-0" min-height="640px">
+                <v-stepper id="import-stepper" v-model="stepperPage" elevation="0" class="pb-0" min-height="70vh">
                     <v-stepper-header>
                         <v-stepper-step :complete="stepperPage > 1" step="1" :color="stepperPage > 1 ? 'success' : 'primary'">
-                            Source
-                            <small>Import source</small>
+                            Type
+                            <small>Import type</small>
                         </v-stepper-step>
                         <v-divider/>
 
                         <v-stepper-step :complete="stepperPage > 2" step="2" :color="stepperPage > 2 ? 'success' : 'primary'">
-                            File
-                            <small>Import file</small>
+                            Source
+                            <small>Import source</small>
                         </v-stepper-step>
                         <v-divider/>
 
@@ -55,16 +55,61 @@
                         <!-- Import type selection -->
                         <v-stepper-content step="1">
                             <import-type-selection 
+                                :language="$props.language"
                                 @import-type-selected="selectImportType"
                             ></import-type-selection>
                         </v-stepper-content>
 
-                        <!-- Import file selection -->
-                        <v-stepper-content step="2">
-                            <import-ebook-file-selection
-                                v-if="stepperPage > 1 && importType == 'e-book'"
+                        <!-- Import source selection -->
+                        <v-stepper-content :class="{
+                            'plain-text-source': importType == 'plain-text',
+                            'youtube-subtitle-source': importType == 'youtube',
+                            'jellyfin-subtitle-source': importType == 'jellyfin-subtitle'
+                        }" step="2">
+                            <!-- Plain text -->
+                            <import-plain-text-source
+                                v-if="stepperPage == 2 && importType == 'plain-text'"
+                                @text-selected="selectImportText" 
+                            ></import-plain-text-source>
+
+                            <!-- Text file -->
+                            <import-text-file-source
+                                v-if="stepperPage == 2 && importType == 'text-file'"
+                                @text-selected="selectImportText" 
+                            ></import-text-file-source>
+
+                            <!-- Subtitle file -->
+                            <import-subtitle-file-source
+                                v-if="stepperPage == 2 && importType == 'subtitle-file'"
+                                @subtitle-selected="selectImportSubtitle"
+                            ></import-subtitle-file-source>
+
+                            <!-- E-book -->
+                            <import-ebook-file-source
+                                v-if="stepperPage == 2 && importType == 'e-book'"
                                 @file-selected="selectImportFile" 
-                            ></import-ebook-file-selection>
+                            ></import-ebook-file-source>
+
+                            <!-- Youtube -->
+                            <import-youtube-subtitle-source
+                                v-if="stepperPage == 2 && importType == 'youtube'"
+                                :language="$props.language"
+                                @text-selected="selectImportText" 
+                            ></import-youtube-subtitle-source>
+
+                            <!-- Jellyfin subtitle -->
+                            <import-jellyfin-subtitle-source
+                                v-if="stepperPage == 2 && importType == 'jellyfin-subtitle'"
+                                :language="$props.language"
+                                @subtitle-selected="selectImportSubtitle" 
+                            ></import-jellyfin-subtitle-source>
+
+                            <!-- Website -->
+                            <import-website-source
+                                v-if="stepperPage == 2 && importType == 'website'"
+                                :language="$props.language"
+                                @text-selected="selectImportText"
+                            ></import-website-source>
                         </v-stepper-content>
 
                         <!-- Library import settings -->
@@ -77,11 +122,11 @@
 
                         <!-- Library import settings -->
                         <v-stepper-content step="4">
-                            <import-text-processing-method-selection
+                            <import-options
                                 v-if="stepperPage > 3"
                                 :language="$props.language"
-                                @text-processing-method-changed="textProcessingMethodChanged"
-                            ></import-text-processing-method-selection>
+                                @import-options-changed="importOptionsChanged"
+                            ></import-options>
                         </v-stepper-content>
                         <v-stepper-content step="5">
                             <!-- Importing info -->
@@ -139,12 +184,19 @@
 
                 <v-btn 
                     v-if="stepperPage < 4"
+                    ref="continueButton"
                     rounded 
                     depressed
                     color="primary" 
                     :disabled="
                         (stepperPage == 1) ||
-                        (stepperPage == 2 && importType === 'e-book' && (!isImportFileValid || importFile === null)) ||
+                        (stepperPage == 2 && importType === 'e-book' && (!isImportSourceValid || importFile === null)) ||
+                        (stepperPage == 2 && importType === 'plain-text' && (!isImportSourceValid || importText === '')) ||
+                        (stepperPage == 2 && importType === 'text-file' && (!isImportSourceValid || importText === '')) ||
+                        (stepperPage == 2 && importType === 'subtitle-file' && !isImportSourceValid) ||
+                        (stepperPage == 2 && importType === 'youtube' && (!isImportSourceValid || importText === '')) ||
+                        (stepperPage == 2 && importType === 'jellyfin-subtitle' && !isImportSourceValid) ||
+                        (stepperPage == 2 && importType === 'website' && (!isImportSourceValid || importText === '')) ||
                         (stepperPage == 3 && !isLibraryValid)
                     "
                     @click="stepForward"
@@ -153,11 +205,12 @@
                 </v-btn>
                 <v-btn 
                     v-if="stepperPage > 3 && importResult !== 'success'"
+                    ref="importButton"
                     rounded 
                     depressed
                     color="primary"
                     :loading="importLoading"
-                    :disabled="stepperPage == 5 && importResult === ''"
+                    :disabled="stepperPage == 5 && importResult === '' || !isImportOptionsValid"
                     @click="finishImport"
                 >
                     Import
@@ -174,11 +227,18 @@
                 importLoading: false,
                 importResult: '',
                 stepperPage: 1  ,
-                isImportFileValid: false,
+                isImportSourceValid: false,
+                isImportOptionsValid: false,
                 isLibraryValid: false,
                 textProcessingMethod: 'detailed',
+                maximumCharactersPerChapter: 200,
                 importType: '',
+
+                // these come from the source step item
                 importFile: null,
+                importText: '',
+                importSubtitles: [],
+                
                 newOrExistingBook: '',
                 bookId: -1,
                 bookName: '',
@@ -193,13 +253,30 @@
         mounted() {
         },
         methods: {
+            enterPressed() {
+                if (this.$refs.continueButton !== undefined && !this.$refs.continueButton.disabled) {
+                    this.stepForward();
+                }
+
+                if (this.$refs.importButton !== undefined && !this.$refs.importButton.disabled) {
+                    this.finishImport();
+                }
+            },
             selectImportType(type) {
                 this.stepperPage = 2;
                 this.importType = type;
             },
             selectImportFile(data) {
                 this.importFile = data.importFile;
-                this.isImportFileValid = data.isImportFileValid;
+                this.isImportSourceValid = data.isImportSourceValid;
+            },
+            selectImportText(data) {
+                this.importText = data.text;
+                this.isImportSourceValid = data.isImportSourceValid;
+            },
+            selectImportSubtitle(data) {
+                this.importSubtitles = data.subtitles;
+                this.isImportSourceValid = data.isImportSourceValid;
             },
             libraryInputChanged(data) {
                 this.isLibraryValid = data.isFormValid;
@@ -215,8 +292,10 @@
                 }
                 
             },
-            textProcessingMethodChanged(method) {
-                this.textProcessingMethod = method;
+            importOptionsChanged(data) {
+                this.textProcessingMethod = data.textProcessingMethod;
+                this.isImportOptionsValid = data.isValid;
+                this.maximumCharactersPerChapter = data.maximumCharactersPerChapter;
             },
             stepForward() {
                 this.stepperPage++;
@@ -225,9 +304,14 @@
                 this.stepperPage--;
 
                 if(this.stepperPage < 2) {
-                    this.importFile = null;
-                    this.isImportFileValid = false;
                     this.importType = '';
+                }
+
+                if(this.stepperPage < 3) {
+                    this.importFile = null;
+                    this.importSubtitles = null;
+                    this.importText = '';
+                    this.isImportSourceValid = false;
                 }
 
                 if(this.stepperPage < 3) {
@@ -244,29 +328,39 @@
             finishImport() {
                 var data = new FormData();
                 data.set('importType', this.importType);
-                data.set('importFile', this.importFile);
+                
+                if (this.importType === 'e-book') {
+                    data.set('importFile', this.importFile);
+                } else if (['youtube', 'plain-text', 'text-file', 'website'].includes(this.importType)) {
+                    data.set('importText', this.importText);
+                } if (['jellyfin-subtitle', 'subtitle-file'].includes(this.importType)) {
+                    data.set('importSubtitles', JSON.stringify(this.importSubtitles));
+                }
+
                 data.set('textProcessingMethod', this.textProcessingMethod);
                 data.set('bookId', this.bookId);
                 data.set('bookName', this.bookName);
                 data.set('chapterName', this.chapterName);
+                data.set('maximumCharactersPerChapter', this.maximumCharactersPerChapter);
 
                 this.importLoading = true;
                 this.stepperPage = 5;
                 this.importResult = '';
+
                 axios.post('/import', data).catch(() => {
                     this.importResult = 'error';
                     this.importLoading = false;
                 }).then((response) => {
-                    if (response.data == 'success') {
+                    if (response.status == 200) {
                         this.importResult = 'success';
                         this.importLoading = false;
                         setTimeout(() => {
                             this.$emit('import-finished', false);
                         }, 1000);
-                    } else {
-                        this.importResult = 'error';
-                        this.importLoading = false;
                     }
+                }).catch((error) => {
+                    this.importResult = 'error';
+                    this.importLoading = false;
                 });
             },
             close() {
