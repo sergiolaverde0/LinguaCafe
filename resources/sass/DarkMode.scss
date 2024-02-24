@@ -54,7 +54,8 @@
 // alert
 #app.dark .v-alert.primary,
 #app.dark .v-alert.success,
-#app.dark .v-alert.error {
+#app.dark .v-alert.error,
+#app.dark .v-alert.warning {
     color: var(--v-textDark-base);
     
     i.v-icon {
@@ -342,6 +343,11 @@
 
 // text block
 #app.dark .text-block-group {
+
+    .subtitle-timestamp {
+        color: var(--v-textDark-base);
+    }
+    
     #vocab-box .vocab-box-toolbar {
         background-color: var(--v-primary-base);
         
@@ -356,7 +362,8 @@
         box-shadow: none;
     }
 
-    #vocab-box #vocab-box-kanji-box .kanji {
+    #vocab-box #vocab-box-kanji-box .kanji,
+    #vocab-side-box #vocab-box-kanji-box .kanji {
         border: 1px solid var(--v-gray3-base);
 
         &:hover {
@@ -375,13 +382,23 @@
         border-radius: 8px;
     }
 
+    // vocab hover box border color
+    #vocab-hover-box {
+        border-color: rgb(130, 130, 130);
+    
+        &:before {
+            border-bottom-color: rgb(130, 130, 130);
+        }
+    }
+
     // vocab box lemma arrow
     #vocab-box .expression i {
         color: var(--v-text-base);
     }
 
     // search result title color
-    #vocab-box #search-results .search-result .search-result-title {
+    #vocab-box #search-results .search-result .search-result-title, 
+    #vocab-side-box #search-results .search-result .search-result-title {
         color: var(--v-textDark-base);
     }
 
@@ -389,6 +406,16 @@
     #search-results .search-result .search-result-definition:hover {
         color: var(--v-textDark-base);
         background-color: var(--v-primary-base);
+    }
+
+    
+    #search-results .search-result.disabled .search-result-definition:hover,
+    #search-results .search-result.disabled .search-result-definition:hover {
+        &:hover {
+            background-color: var(--v-foreground-base);
+            color: var(--v-text-base);
+            cursor: default;
+        }
     }
 
     // search bar result icon color transition
@@ -403,18 +430,21 @@
     
 
     // vocab box stage buttons border
-    #vocab-box #vocab-box-stage-buttons .v-btn {
+    #vocab-box #vocab-box-stage-buttons .v-btn,
+    #vocab-side-box #vocab-box-stage-buttons .v-btn {
         border-color: var(--v-gray3-base);
         color: var(--v-text-base) !important;
     }
 
     // vocab box stage button
-    #vocab-box #vocab-box-stage-buttons .v-btn.v-btn--active {
+    #vocab-box #vocab-box-stage-buttons .v-btn.v-btn--active, 
+    #vocab-side-box #vocab-box-stage-buttons .v-btn.v-btn--active {
         background-color: var(--v-gray-base) !important;
     }
 
     
-    #vocab-box #vocab-box-stage-buttons .v-btn.v-btn--active i {
+    #vocab-box #vocab-box-stage-buttons .v-btn.v-btn--active i,
+    #vocab-side-box #vocab-box-stage-buttons .v-btn.v-btn--active i {
         color: var(--v-text-base) !important;
     }
 
@@ -494,6 +524,12 @@
 }
 
 // color picker actions
-.color-picker-actions {
+#app.dark .color-picker-actions {
     background-color: var(--v-foreground-base);
+}
+
+// library import dialog
+#app.dark #import-dialog .youtube-subtitle-source #selected-youtube-subtitle,
+#app.dark #import-dialog .jellyfin-subtitle-source #selected-jellyfin-subtitle {
+    background-color: var(--v-gray-base);
 }

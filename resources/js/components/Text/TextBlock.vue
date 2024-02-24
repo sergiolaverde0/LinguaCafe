@@ -1,57 +1,64 @@
 <template>
     <div 
         class="text-block w-100 overflow-x-hidden" 
-        :textblock="$props.textBlockId" 
         @mousemove="removePhraseHover"
     >
-        <template v-for="(word, wordIndex) in words"><!--
-            --><div 
-                :key="wordIndex"
-                v-if="word.word !== 'NEWLINE' && /\S/.test(word.word)" 
-                :wordindex="wordIndex" 
-                :stage="word.stage" 
-                :phrasestage="word.phraseStage" 
-                :class="{
-                    'no-highlight': hideAllHighlights || (hideNewWordHighlights && word.stage == 2),
-                    'plain-text-mode': plainTextMode,
-                    'word': true,
-                    'highlighted': word.selected || word.hover,
-                    'phrase': word.phraseIndexes.length > 0, 
-                    'phrase-start': word.phraseStart, 
-                    'phrase-end': word.phraseEnd,
-                    'space-after': word.spaceAfter
-                }"
-                :style="{
-                    'font-size': fontSize + 'px', 
-                    'margin-bottom': (lineSpacing * 4) + 'px'
-                }" 
-                
-                
-                @pointerenter="hoverPhraseSelection(wordIndex);"
-                @touchstart="startSelectionTouch($event, word.word, wordIndex)" 
-                @mousedown.stop="startSelection($event, word.word, wordIndex)" 
-                @touchmove="updateSelectionTouch($event, wordIndex);" 
-                @mousemove.stop="updateSelectionMouse($event, wordIndex);" 
-                @touchend.stop="finishSelection($event)"
-                @mouseup.stop="finishSelection($event)"
-                @mouseleave=";"
-            ><!--
-                --><template v-if="language == 'japanese'"><!--
-                    --><ruby class="rubyword" :wordindex="wordIndex"><!--
-                        -->{{ word.word }}<!--
-                        --><rt v-if="word.stage == 2 && furiganaOnNewWords && word.reading.length && word.word !== word.reading" :style="{'font-size': (fontSize - 4) + 'px'}"><!--
-                            -->{{ word.reading }}<!--
-                        --></rt><!--
-                        --><rt v-if="word.stage < 0 && furiganaOnHighlightedWords && word.reading.length && word.word !== word.reading" :style="{'font-size': (fontSize - 4) + 'px'}"><!--
-                            -->{{ word.reading }}<!--
-                        --></rt><!--
-                    --></ruby>
-                </template><!--
-                --><template v-if="language !== 'japanese'">{{ word.word }}</template><!--
-                --><template v-if="plainTextMode && word.spaceAfter">&nbsp;</template><!--
-            --></div><!--
-            --><br v-if="word.word == 'NEWLINE'"><!--
-        --></template>
+        <template>
+            <template v-for="(word, wordIndex) in words"><!--
+                --><div class="subtitle-timestamp rounded-pill py-1 mt-12 mb-1" v-if="word.subtitleIndex !== -1"><!--
+                    -->{{ subtitleTimestamps[word.subtitleIndex].start }}<!--
+                --></div><!--
+                --><div 
+                    :key="wordIndex"
+                    v-if="word.word !== 'NEWLINE' && /\S/.test(word.word)" 
+                    :wordindex="wordIndex" 
+                    :stage="word.stage" 
+                    :phrasestage="word.phraseStage" 
+                    :class="{
+                        'no-highlight': hideAllHighlights || (hideNewWordHighlights && word.stage == 2),
+                        'plain-text-mode': plainTextMode,
+                        'word': true,
+                        'highlighted': word.selected || word.hover,
+                        'highlight-start': (word.selected && wordIndex > 0 && !words[wordIndex - 1].selected) || (!word.selected && word.hover),
+                        'highlight-end': (word.selected && wordIndex < words.length - 1 && !words[wordIndex + 1].selected) || (!word.selected && word.hover),
+                        'phrase': word.phraseIndexes.length > 0, 
+                        'phrase-start': word.phraseStart, 
+                        'phrase-end': word.phraseEnd,
+                        'space-after': word.spaceAfter
+                    }"
+                    :style="{
+                        'font-size': fontSize + 'px', 
+                        'margin-bottom': (lineSpacing * 4) + 'px'
+                    }" 
+                    
+                    
+                    @pointerenter="hoverPhraseSelection(wordIndex);"
+                    @pointerleave="updateHoveredWords(null)"
+                    @touchstart="startSelectionTouch($event, word.word, wordIndex)" 
+                    @mousedown.stop="startSelection($event, word.word, wordIndex)" 
+                    @touchmove="updateSelectionTouch($event, wordIndex);" 
+                    @mousemove.stop="updateSelectionMouse($event, wordIndex);" 
+                    @touchend.stop="finishSelection($event)"
+                    @mouseup.stop="finishSelection($event)"
+                    @mouseleave=";"
+                ><!--
+                    --><template v-if="language == 'japanese'"><!--
+                        --><ruby class="rubyword" :wordindex="wordIndex"><!--
+                            -->{{ word.word }}<!--
+                            --><rt v-if="word.stage == 2 && furiganaOnNewWords && word.furigana.length && word.word !== word.furigana" :style="{'font-size': (fontSize - 4) + 'px'}"><!--
+                                -->{{ word.furigana }}<!--
+                            --></rt><!--
+                            --><rt v-if="word.stage < 0 && furiganaOnHighlightedWords && word.furigana.length && word.word !== word.furigana" :style="{'font-size': (fontSize - 4) + 'px'}"><!--
+                                -->{{ word.furigana }}<!--
+                            --></rt><!--
+                        --></ruby>
+                    </template><!--
+                    --><template v-if="language !== 'japanese'">{{ word.word }}</template><!--
+                    --><template v-if="plainTextMode && word.spaceAfter">&nbsp;</template><!--
+                --></div><!--
+                --><br v-if="word.word == 'NEWLINE'"><!--
+            --></template>
+        </template>
     </div>
 </template>
 
@@ -90,10 +97,10 @@
             }
         },
         props: {
-            textBlockId: Number,
             _words: Array,
             _phrases: Array,
             _uniqueWords: Array,
+            subtitleTimestamps: Array,
             language: String,
             hideAllHighlights: Boolean,
             hideNewWordHighlights: Boolean,
@@ -130,10 +137,24 @@
         },
         methods: {
             hoverPhraseSelection: function(wordIndex) {
+                // collection for hover vocabulary box
+                var hoveredWords = [];
+                var hoveredPhraseIndex = -1;
+
                 this.removePhraseHover();
                 var phraseIndexes = this.words[wordIndex].phraseIndexes;
                 if (!phraseIndexes.length) {
+
+                    // update hovered words
+                    var word = JSON.parse(JSON.stringify(this.words[wordIndex]));
+                    word.hover = true;
+                    hoveredWords.push(word);
+                    hoveredWords[0].wordIndex = wordIndex;
+                    this.updateHoveredWords(hoveredWords);
+
                     return;
+                } else {
+                    hoveredPhraseIndex = this.words[wordIndex].phraseIndexes[0];
                 }
 
                 // find the first word of the phrase
@@ -141,18 +162,50 @@
                 while (currentWordIndex > 0 && (this.words[currentWordIndex - 1].word == 'NEWLINE' || this.words[currentWordIndex - 1].phraseIndexes.some(el => phraseIndexes.includes(el)))) {
                     currentWordIndex--;
                 }
-
-                // highlight the phrase
                 
+                // highlight the phrase
                 do {
                     this.words[currentWordIndex].hover = true;
+
+                    // add words for hover vocabulary box
+                    if (this.words[currentWordIndex].phraseIndexes.includes(hoveredPhraseIndex) && this.words[currentWordIndex].word !== 'NEWLINE') {
+                        hoveredWords.push(this.words[currentWordIndex]);
+                        hoveredWords[hoveredWords.length - 1].wordIndex = currentWordIndex;
+                    }
+
                     currentWordIndex ++;
                 } while(currentWordIndex < this.words.length && (this.words[currentWordIndex].word == 'NEWLINE' || this.words[currentWordIndex].phraseIndexes.some(el => phraseIndexes.includes(el))));
+
+                this.updateHoveredWords(hoveredWords, hoveredPhraseIndex);
             },
             removePhraseHover: function() {
                 for (let i  = 0; i < this.words.length; i++) {
                     this.words[i].hover = false;
                 }
+            },
+            updateHoveredWords: function(hoveredWords, hoveredPhraseIndex) {
+                var data = {
+                    hoveredWords: JSON.parse(JSON.stringify(hoveredWords)),
+                    translation: '',
+                    reading: '',
+                };
+
+                if (hoveredWords !== null && hoveredWords.length === 1) {
+                    var uniqueWordIndex = this.getUniqueWordIndex(hoveredWords[0].word.toLowerCase());
+                    var uniqueWord = this.uniqueWords[uniqueWordIndex];
+                    
+                    data.translation = uniqueWord.translation;  
+                    data.reading = uniqueWord.reading;
+                    data.hoveredWords[0].lemma = uniqueWord.base_word;
+                }
+
+                if (hoveredWords !== null && hoveredWords.length > 1) {
+                    data.translation = this.phrases[hoveredPhraseIndex].translation;
+                    data.reading = this.phrases[hoveredPhraseIndex].reading;
+                }
+                
+
+                this.$emit('updateHoveredWords', data);
             },
             selectPhraseInstanceByWord: function(wordIndex, phraseIndex) {
                 var currentWordIndex = wordIndex;
@@ -366,7 +419,7 @@
                     }
                     
                     this.updatePhraseBorders();
-                    this.$emit('textSelected', this.selection, this.selectedPhrase, this.$props.textBlockId);
+                    this.$emit('textSelected', this.selection, this.selectedPhrase);
                 }
             },
             unselectWord() {
@@ -426,10 +479,6 @@
                     }
                 }
             },
-            /*
-                Emits an event to TextBlockGroup, which will run updateWordLookupCount or 
-                updatePhraseLookupCount on all TextBlocks.
-            */
             updateLookupCount(word) {
                 if (this.selection.length == 1) {
                     this.$emit('updateLookupCount', 'word', word, null);

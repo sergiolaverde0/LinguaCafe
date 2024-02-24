@@ -26,6 +26,16 @@
     overflow-y: hidden !important;
     overflow-x: visible !important;
     
+    .subtitle-timestamp {
+        background-color: var(--v-primary-base);
+        color: white;
+        border-radius: 30px;
+        width: 72px;
+        text-align: center;
+        font-size: 15px;
+        font-weight: bold;
+    }
+
     * {
         font-family: notosans-jp !important;
     }
@@ -160,10 +170,21 @@
             border-color: var(--v-readerWordSelection-base) !important;
         }
 
+        &.highlight-start:not(.phrase) {
+            border-top-left-radius: 6px;
+            border-bottom-left-radius: 6px;
+        }
+
+        &.highlight-end:not(.phrase) {
+            border-top-right-radius: 6px;
+            border-bottom-right-radius: 6px;
+        }
+
         &.space-after {
             margin-right: 5px !important;
-
-            &.highlighted, &.phrase {
+            
+            &.highlighted:not(.highlight-end):not(.phrase-end),
+            &.phrase:not(.phrase-end) {
                 margin-right: 0px !important;
                 padding-right: 5px !important;
             }

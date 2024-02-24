@@ -7,6 +7,10 @@
             'chinese-font': language == 'chinese'
         }"
     >
+
+        <review-hotkey-information-dialog
+            v-model="hotkeyDialog"
+        ></review-hotkey-information-dialog>
         <div id="review" v-if="!finished">
             <!-- Progress bar -->
             <div id="review-progress-line" class="d-flex align-center">
@@ -48,9 +52,10 @@
             <div id="toolbar">
                 <v-btn title="Fullscreen" icon class="my-2" @click="fullscreen" v-if="!settings.fullscreen"><v-icon>mdi-arrow-expand-all</v-icon></v-btn>
                 <v-btn title="Exit fullscreen" icon class="my-2" @click="exitFullscreen" v-if="settings.fullscreen"><v-icon>mdi-arrow-collapse-all</v-icon></v-btn>
+                <v-btn title="Toggle example sentence mode" icon class="my-2" @click="settings.sentenceMode = !settings.sentenceMode; saveSettings();"><v-icon :color="settings.sentenceMode ? 'primary' : ''">mdi-card-text</v-icon></v-btn>
                 <v-btn title="Increase font size" icon class="my-2" @click="settings.fontSize ++; saveSettings();"><v-icon>mdi-magnify-plus</v-icon></v-btn>
                 <v-btn title="Decrease font size" icon class="my-2" @click="settings.fontSize --; saveSettings();"><v-icon>mdi-magnify-minus</v-icon></v-btn>
-                <v-btn title="Toggle example sentence mode" icon class="my-2" @click="settings.sentenceMode = !settings.sentenceMode; saveSettings();"><v-icon :color="settings.sentenceMode ? 'primary' : ''">mdi-card-text</v-icon></v-btn>
+                <v-btn title="Show hotkey information" icon class="my-2" @click="hotkeyDialog = !hotkeyDialog;"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
             </div>
 
             <!-- Card -->
@@ -68,13 +73,14 @@
                         <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'word'">
                             <!-- Example sentence mode -->
                             <div v-show="settings.sentenceMode" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                <template v-if="reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
                                 {{ reviews[currentReviewIndex].word }}<hr>
 
                                 <text-block-group
                                     ref="textBlock"
                                     :theme="theme"
                                     :fullscreen="settings.fullscreen"
-                                    :_text-blocks="textBlocks"
+                                    :_text="exampleSentence"
                                     :language="language"
                                     :highlight-words="true"
                                     :plain-text-mode="false"
@@ -108,7 +114,7 @@
                                         ref="textBlock"
                                         :theme="theme"
                                         :fullscreen="settings.fullscreen"
-                                        :_text-blocks="textBlocks"
+                                        :_text="exampleSentence"
                                         :language="language"
                                         :font-size="settings.fontSize"
                                     ></text-block-group>
@@ -151,7 +157,7 @@
                         <template v-if="reviews[currentReviewIndex] !== undefined">
                             <div class="phrase-words" :style="{'font-size': (settings.fontSize) + 'px'}">
                                 <span 
-                                    v-for="(word, wordIndex) in textBlocks[0].words" :key="wordIndex"
+                                    v-for="(word, wordIndex) in exampleSentence.words" :key="wordIndex"
                                     :class="{'mr-2': word.spaceAfter}"
                                 >{{ word.word }}</span>
                             </div>
@@ -203,7 +209,8 @@
         data: function() {
             return {
                 theme: (this.$cookie.get('theme') === null ) ? 'light' : this.$cookie.get('theme'),
-                textBlocks: [
+                hotkeyDialog: false,
+                exampleSentence: [
                     {
                         id: -1,
                         words: [],
@@ -335,8 +342,8 @@
 
                     }
                 } else {
-                    for (var i = 0; i < this.textBlocks[0].words.length; i++) {
-                        if (wordsToSkip.includes(this.textBlocks[0].words[i].word)) {
+                    for (var i = 0; i < this.exampleSentence.words.length; i++) {
+                        if (wordsToSkip.includes(this.exampleSentence.words[i].word)) {
                             continue;
                         }
 
@@ -442,8 +449,7 @@
 
                 this.finishedReviews ++;
                 this.currentReviewIndex = Math.floor(Math.random() * this.reviews.length);
-                console.log(this.reviews[this.currentReviewIndex]);
-                this.textBlocks[0] = {
+                this.exampleSentence = {
                     id: -1,
                     words: [],
                     phrases: [],
@@ -451,10 +457,10 @@
                 };
 
                 axios.get('/vocabulary/example-sentence/' + this.reviews[this.currentReviewIndex].id + '/' + this.reviews[this.currentReviewIndex].type).then((response) => {
-                    let firstTime = (this.textBlocks[0].id == -1);
+                    let firstTime = (this.exampleSentence.id == -1);
 
                     if (response.data !== 'no example sentence') {
-                        this.textBlocks[0] = {
+                        this.exampleSentence = {
                             id: 0,
                             words: response.data.words,
                             phrases: response.data.phrases,

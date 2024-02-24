@@ -5,7 +5,6 @@
             'w-100': true,
             'chinese-font': language == 'chinese'
         }"
-        @mouseup="unselectAllWords"
     >
         <!-- Anki api notifications -->
         <v-snackbar 
@@ -41,7 +40,7 @@
         </v-snackbar>
 
         <slot
-            :textBlocks="textBlocks"
+            :text="text"
             :language="language"
             :hideAllHighlights="hideAllHighlights"
             :hideNewWordHighlights="hideNewWordHighlights"
@@ -54,15 +53,16 @@
             :unselectAllWords="unselectAllWords"
             :updateLookupCount="updateLookupCount"
             :startSelection="startSelection"
+            :updateHoveredWords="updateHoverVocabularyBox"
         >
             <text-block
-                v-for="textBlock in textBlocks"
-                :key="textBlock.id"
-                ref="textBlock"
-                :textBlockId="textBlock.id"
-                :_words="textBlock.words"
-                :_phrases="textBlock.phrases"
-                :_uniqueWords="textBlock.uniqueWords"
+                :key="'text-block' + textBlockKey"
+                ref="text"
+                :textId="text.id"
+                :_words="text.words"
+                :_phrases="text.phrases"
+                :_uniqueWords="text.uniqueWords"
+                :subtitle-timestamps="subtitleTimestamps"
                 :language="language"
                 :hideAllHighlights="hideAllHighlights"
                 :hideNewWordHighlights="hideNewWordHighlights"
@@ -75,29 +75,43 @@
                 @unselectAllWords="unselectAllWords"
                 @updateLookupCount="updateLookupCount"
                 @startSelection="startSelection"
+                @updateHoveredWords="updateHoverVocabularyBox"
             ></text-block>
         </slot>
 
-        <!-- Vocab box -->
+        <!--Vocabulary popup box-->
+        <vocabulary-hover-box
+            v-if="hoverVocabBox.active && !hoverVocabBox.disabledWhileSelecting && (($props.vocabularySidebar && $props.vocabularySidebarFits) || !vocabBox.active)"
+            :key="'vocabulary-hover-box' + hoverVocabBox.key"
+            :user-translation="hoverVocabBox.userTranslation"
+            :dictionary-translation="hoverVocabBox.dictionaryTranslation"
+            :deepl-translation="hoverVocabBox.deeplTranslation"
+            :positionLeft="hoverVocabBox.positionLeft"
+            :positionTop="hoverVocabBox.positionTop"
+            :reading="hoverVocabBox.reading"
+        ></vocabulary-hover-box>
+
+        <!--Vocabulary popup box-->
         <vocabulary-box
+            v-if="(!$props.vocabularySidebar || !$props.vocabularySidebarFits) && vocabBox.active"
             ref="vocabularyBox"
-            v-if="modernVocabBox.active"
             :language="$props.language"
-            :active="modernVocabBox.active"
-            :type="modernVocabBox.type"
-            :positionLeft="modernVocabBox.positionLeft"
-            :positionTop="modernVocabBox.positionTop"
-            :width="modernVocabBox.width"
-            :kanjiList="modernVocabBox.kanjiList"
-            :word="modernVocabBox.word"
-            :phrase="modernVocabBox.phrase"
-            :stage="modernVocabBox.stage"
-            :_reading="modernVocabBox.reading"
-            :_baseWord="modernVocabBox.baseWord"
-            :_baseWordReading="modernVocabBox.baseWordReading"
-            :_phraseReading="modernVocabBox.phraseReading"
-            :_translationText="modernVocabBox.translationText"
-            :_searchField="modernVocabBox.searchField"
+            :active="vocabBox.active"
+            :type="vocabBox.type"
+            :positionLeft="vocabBox.positionLeft"
+            :positionTop="vocabBox.positionTop"
+            :width="vocabBox.width"
+            :kanjiList="vocabBox.kanjiList"
+            :word="vocabBox.word"
+            :phrase="vocabBox.phrase"
+            :stage="vocabBox.stage"
+            :auto-highlight-words="$props.autoHighlightWords"
+            :_reading="vocabBox.reading"
+            :_baseWord="vocabBox.baseWord"
+            :_baseWordReading="vocabBox.baseWordReading"
+            :_phraseReading="vocabBox.phraseReading"
+            :_translationText="vocabBox.translationText"
+            :_searchField="vocabBox.searchField"
             @setStage="setStage"
             @unselectAllWords="unselectAllWords"
             @updateVocabBoxData="updateVocabBoxData"
@@ -105,6 +119,36 @@
             @deletePhrase="deletePhrase"
             @addSelectedWordToAnki="addSelectedWordToAnki"
         ></vocabulary-box>
+
+        <!--Vocabulary sidebar-->
+        <vocabulary-side-box
+            v-if="$props.vocabularySidebarFits && $props.vocabularySidebar && !vocabBox.sidebarHidden"
+            :key="'vocabulary-side-box-' + vocabBox.key"
+            ref="vocabularySideBox"
+            :language="$props.language"
+            :active="vocabBox.active"
+            :type="vocabBox.type"
+            :positionLeft="vocabBox.positionLeft"
+            :positionTop="vocabBox.positionTop"
+            :height="vocabBox.height"
+            :kanjiList="vocabBox.kanjiList"
+            :word="vocabBox.word"
+            :phrase="vocabBox.phrase"
+            :stage="vocabBox.stage"
+            :auto-highlight-words="$props.autoHighlightWords"
+            :_reading="vocabBox.reading"
+            :_baseWord="vocabBox.baseWord"
+            :_baseWordReading="vocabBox.baseWordReading"
+            :_phraseReading="vocabBox.phraseReading"
+            :_translationText="vocabBox.translationText"
+            :_searchField="vocabBox.searchField"
+            @setStage="setStage"
+            @unselectAllWords="unselectAllWords"
+            @updateVocabBoxData="updateVocabBoxData"
+            @addNewPhrase="addNewPhrase"
+            @deletePhrase="deletePhrase"
+            @addSelectedWordToAnki="addSelectedWordToAnki"
+        ></vocabulary-side-box>
     </div>
 </template>
 
@@ -112,34 +156,40 @@
     export default {
         data: function() {
             return {
+                textBlockKey: 0,
                 snackBars: [
                 ],
                 snackbarId: 1,
                 ankiAutoAddCards: false,
                 ankiShowNotifications: false,
-                textBlocks: this.$props._textBlocks,
-                vocabBox: {
-                    tab: 0,
-                    closed: true,
-                    selectedStageButton: 0,
-                    width: window.innerWidth > 440 ? 400 : window.innerWidth - 20,
-                    position: {
-                        left: 0,
-                        top: 0
-                    },
-                    searchField: '',
-                    searchResults: [],
-                    translationText: '',
-                    translationList: [],
+                text: this.$props._text,
+                hoverVocabBox: {
+                    dictionarySearchDelay: null,
+                    dictionarySearchTerm: '',
+                    disabledWhileSelecting: false,
+                    active: false,
+                    key: 0,
+                    hoveredWords: null,
+                    hoveredPhrase: -1,
                     reading: '',
-                    base_word: '',
-                    base_word_reading: '',
-                    kanji: [],
+                    userTranslation: '',
+                    dictionaryTranslation: '',
+                    deeplTranslation: '',
+                    positionLeft: 0,
+                    positionTop: 0,
                 },
-                modernVocabBox: {
+                vocabBox: {
+                    /*
+                        Keep the sidebar hidden until the first position
+                        update, so it won't jump around on the screen when
+                        a text is opened.
+                    */
+                    sidebarHidden: true,
+
+                    key: 0,
                     active: false,
                     // word, new phrase, existing phrase
-                    type: 'word',
+                    type: 'empty',
 
                     // data for word
                     word: '',
@@ -162,12 +212,12 @@
                     width: 400,
                     positionLeft: 0,
                     positionTop: 0,
+                    height: 0,
                     searchField: '',
                     searchResults: [],
                 },
                 selection: [],
                 selectedPhrase: -1,
-                selectedTextBlock: -1,
                 phraseCurrentlySaving: false,
             }
         },
@@ -178,7 +228,13 @@
             },
             theme: String,
             fullscreen: Boolean,
-            _textBlocks: Array,
+            _text: Object,
+            subtitleTimestamps: {
+                type: Array,
+                default: () => {
+                    return [];
+                }
+            },
             language: String,
             hideAllHighlights: {
                 type: Boolean,
@@ -208,15 +264,41 @@
             furiganaOnNewWords: {
                 type: Boolean,
                 default: false
+            },
+            vocabularySidebar: {
+                type: Boolean,
+                default: false
+            },
+            vocabularySidebarFits: {
+                type: Boolean,
+                default: true
+            },
+            hotkeysEnabled: {
+                type: Boolean,
+                default: false
+            },
+            vocabularyHoverBox: {
+                type: Boolean,
+                default: false
+            },
+            vocabularyHoverBoxSearch: {
+                type: Boolean,
+                default: false
+            },
+            autoHighlightWords: {
+                type: Boolean,
+                default: true
             }
         },
         watch: {
-            _textBlocks: function(newVal, oldVal) {
-                this.textBlocks = newVal;
+            _text: function(newVal, oldVal) {
+                this.text = newVal;
             }
         },
         mounted() {
-            window.addEventListener('resize', this.updateVocabBoxPosition);
+            window.addEventListener('keydown', this.hotkeyHandle);
+            window.addEventListener('resize', this.updateVocabBoxPositionDelay);
+            window.addEventListener('mouseup', this.unselectAllWords);
 
             axios.post('/settings/get-by-name', {
                 'settingNames': [
@@ -227,55 +309,263 @@
                 this.ankiAutoAddCards = response.data.ankiAutoAddCards;
                 this.ankiShowNotifications = response.data.ankiShowNotifications;
             });
+
+            this.updateVocabBoxPositionDelay();
         },  
+        beforeDestroy() {
+            window.removeEventListener('resize', this.updateVocabBoxPositionDelay);
+            window.removeEventListener('mouseup', this.unselectAllWords);
+            window.removeEventListener('keydown', this.hotkeyHandle);
+        },
         methods: {
-            updateSelection(newSelection, newSelectedPhrase, textBlockId) {
-                this.modernVocabBox.tab = 0;
+            hotkeyHandle(event) {
+                if (!this.$props.hotkeysEnabled) {
+                    return;
+                }
+                
+                switch(event.which) {
+                    // set stage 0-7
+                    case 48:
+                    case 49:
+                    case 50:
+                    case 51:
+                    case 52:
+                    case 53:
+                    case 54:
+                    case 55:
+                        event.preventDefault();
+                        this.setStage(48 - event.which);
+                        break;
+
+                    // set stage to ignore
+                    case 88:
+                        event.preventDefault();
+                        this.setStage(1);
+                        break;
+                    
+                        // decrease font size
+                    case 73:
+                        // do not do anything if ctrl+shift+i is pressed for dev tools
+                        if (event.ctrlKey || event.shiftKey) {
+                            return;
+                        }
+
+                        this.$emit('decrease-font-size');
+                        break;
+
+                    // increase font size
+                    case 79:
+                        event.preventDefault();
+                        this.$emit('increase-font-size');
+                        break;
+
+                    // scroll up
+                    case 38:
+                    case 87:
+                        event.preventDefault();
+                        this.scrollText('up', event.ctrlKey || event.shiftKey);
+                        break;
+                    
+                    // scroll down
+                    case 40:
+                    case 83:
+                        event.preventDefault();
+                        this.scrollText('down', event.ctrlKey || event.shiftKey);
+                        break;
+
+                    // add selected word to anki
+                    case 70:
+                        event.preventDefault();
+                        this.addSelectedWordToAnki();
+                        break;
+
+                    // unselect all words
+                    case 27:
+                        event.preventDefault();
+                        this.unselectAllWords();
+                        break;
+
+                    // previous
+                    case 37:
+                    case 65:
+                        event.preventDefault();
+                        this.selectPreviousWord(event.ctrlKey, event.shiftKey);
+                        break;
+
+                    // next
+                    case 39:
+                    case 68:
+                        event.preventDefault();
+                        this.selectNextWord(event.ctrlKey, event.shiftKey);
+                        break;
+                }
+            },
+            selectPreviousWord(newWordOnly, highlightedWordOnly) {
+                if (!this.selection.length) {
+                    var currentWordIndex = this.text.words.length - 1;
+                } else {
+                    var currentWordIndex = this.selection[0].wordIndex;
+                }
+
+                var wordToSelect = -1;
+
+                // there are no previous words
+                if (currentWordIndex == 0) {
+                    return;
+                }
+
+                // go through the text backwards, and find a word to select 
+                for (var wordIndex = currentWordIndex - 1; wordIndex >= 0; wordIndex--) {
+                    // skip not displayed whitespace words
+                    if (document.querySelector('.text-block .word[wordindex="' + wordIndex  + '"]') === null) {
+                        continue;
+                    }
+
+                    // select the previous word if it's a simple arrow key press
+                    if (!newWordOnly && !highlightedWordOnly) {
+                        wordToSelect = wordIndex;
+                        break;
+                    }
+
+                    // select the previous new word
+                    if (newWordOnly && this.text.words[wordIndex].stage == 2) {
+                        wordToSelect = wordIndex;
+                        break;
+                    }
+
+                    // select the previous highlighted word
+                    if (highlightedWordOnly && this.text.words[wordIndex].stage < 0) {
+                        wordToSelect = wordIndex;
+                        break;
+                    }
+                }
+
+                // return if no selectable word was found
+                if (wordToSelect === -1) {
+                    return;
+                }
+                
+                // select the new word
+                this.unselectAllWords();
+                this.$nextTick(() => {
+                    var wordElement = document.querySelector('.text-block .word[wordindex="' + wordToSelect  + '"]');
+                    var mouseDownEvent = new CustomEvent('mousedown', {cancelable: true});
+                    var mouseUpEvent = new CustomEvent('mouseup', {cancelable: true});
+                    wordElement.dispatchEvent(mouseDownEvent);
+                    wordElement.dispatchEvent(mouseUpEvent);
+                });
+            },
+            selectNextWord(newWordOnly, highlightedWordOnly) {
+                if (!this.selection.length) {
+                    var currentWordIndex = 0;
+                } else {
+                    var currentWordIndex = this.selection[this.selection.length - 1].wordIndex;
+                }
+
+                var wordToSelect = -1;
+
+                // there are no next words to select
+                if (currentWordIndex == this.text.words.length - 1) {
+                    return;
+                }
+
+                // go through the text forward, and find a word to select 
+                for (var wordIndex = currentWordIndex + 1; wordIndex < this.text.words.length; wordIndex++) {
+                    // skip not displayed whitespace words
+                    if (document.querySelector('.text-block .word[wordindex="' + wordIndex  + '"]') === null) {
+                        continue;
+                    }
+
+                    // select the previous word if it's a simple arrow key press
+                    if (!newWordOnly && !highlightedWordOnly) {
+                        wordToSelect = wordIndex;
+                        break;
+                    }
+
+                    // select the previous new word
+                    if (newWordOnly && this.text.words[wordIndex].stage == 2) {
+                        wordToSelect = wordIndex;
+                        break;
+                    }
+
+                    // select the previous highlighted word
+                    if (highlightedWordOnly && this.text.words[wordIndex].stage < 0) {
+                        wordToSelect = wordIndex;
+                        break;
+                    }
+
+                }
+
+                // return if no selectable word was found
+                if (wordToSelect === -1) {
+                    return;
+                }
+
+                // select the new word
+                this.unselectAllWords();
+                this.$nextTick(() => {
+                    var wordElement = document.querySelector('.text-block .word[wordindex="' + wordToSelect  + '"]');
+                    var mouseDownEvent = new CustomEvent('mousedown', {cancelable: true});
+                    var mouseUpEvent = new CustomEvent('mouseup', {cancelable: true});
+                    wordElement.dispatchEvent(mouseDownEvent);
+                    wordElement.dispatchEvent(mouseUpEvent);
+                });
+            },
+            scrollText(direction, largeScroll) {
+                let scrollChange = direction == 'up' ? -40 : 40;
+
+                if (largeScroll) {
+                    scrollChange *= 8;
+                }
+
+
+                document.getElementsByClassName('vocab-box-area')[0].scrollBy(0, scrollChange);
+            },
+            updateSelection(newSelection, newSelectedPhrase) {
+                this.vocabBox.tab = 0;
                 this.selection = newSelection;
                 this.selectedPhrase = newSelectedPhrase;
-                this.selectedTextBlock = textBlockId;
+                this.vocabBox.active = true;
 
                 // update vocab box data
-                this.modernVocabBox.active = false;
-                this.$nextTick(() => {
-                    this.modernVocabBox.active = true;
-                });
+                this.vocabBox.key ++;
 
-                this.modernVocabBox.searchField = '';
-                this.modernVocabBox.translationText = '';
-                this.modernVocabBox.word = '';
-                this.modernVocabBox.phrase = [];
-                this.modernVocabBox.reading = '';
-                this.modernVocabBox.kanjiList = [];
-                this.modernVocabBox.baseWord = '';
-                this.modernVocabBox.baseWordReading = '';
+                this.vocabBox.searchField = '';
+                this.vocabBox.translationText = '';
+                this.vocabBox.word = '';
+                this.vocabBox.phrase = [];
+                this.vocabBox.reading = '';
+                this.vocabBox.kanjiList = [];
+                this.vocabBox.baseWord = '';
+                this.vocabBox.baseWordReading = '';
 
                 
                 if (this.selection.length == 1) {
-                    var uniqueWord = this.textBlocks[this.selectedTextBlock].uniqueWords[this.selection[0].uniqueWordIndex];
-                    this.modernVocabBox.type = 'word';
-                    this.modernVocabBox.word = uniqueWord.word;
-                    this.modernVocabBox.reading = uniqueWord.reading;
-                    this.modernVocabBox.baseWord = uniqueWord.base_word;
-                    this.modernVocabBox.baseWordReading = uniqueWord.base_word_reading;
-                    this.modernVocabBox.translationText = uniqueWord.translation;
-                    this.modernVocabBox.stage = uniqueWord.stage;
+                    var uniqueWord = this.text.uniqueWords[this.selection[0].uniqueWordIndex];
+                    
+                    this.vocabBox.type = 'word';
+                    this.vocabBox.word = uniqueWord.word;
+                    this.vocabBox.reading = uniqueWord.reading;
+                    this.vocabBox.baseWord = uniqueWord.base_word;
+                    this.vocabBox.baseWordReading = uniqueWord.base_word_reading;
+                    this.vocabBox.translationText = uniqueWord.translation;
+                    this.vocabBox.stage = uniqueWord.stage;
                     if (uniqueWord.base_word !== '') {
-                        this.modernVocabBox.searchField = uniqueWord.base_word;
+                        this.vocabBox.searchField = uniqueWord.base_word;
 
                         // remove unnecessary parts of the search term
-                        this.modernVocabBox.searchField = this.trimSearchTerm(this.modernVocabBox.searchField);
+                        this.vocabBox.searchField = this.trimSearchTerm(this.vocabBox.searchField);
                     } else {
-                        this.modernVocabBox.searchField = uniqueWord.word;
+                        this.vocabBox.searchField = uniqueWord.word;
                     }
                 } else {
                     if (this.selectedPhrase !== -1) {
-                        this.modernVocabBox.type = 'phrase';
-                        this.modernVocabBox.reading = this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].reading;
-                        this.modernVocabBox.translationText = this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].translation;
-                        this.modernVocabBox.stage = this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].stage;
+                        this.vocabBox.type = 'phrase';
+                        this.vocabBox.reading = this.text.phrases[this.selectedPhrase].reading;
+                        this.vocabBox.translationText = this.text.phrases[this.selectedPhrase].translation;
+                        this.vocabBox.stage = this.text.phrases[this.selectedPhrase].stage;
                     } else {
-                        this.modernVocabBox.type = 'new-phrase';
+                        this.vocabBox.type = 'new-phrase';
                     }
 
                     for (let i = 0; i < this.selection.length; i++) {
@@ -284,16 +574,16 @@
                         }
                      
                         if (this.selection.length > 1) {
-                            this.modernVocabBox.phrase.push(this.selection[i]);
+                            this.vocabBox.phrase.push(this.selection[i]);
                         }
 
-                        this.modernVocabBox.searchField += this.selection[i].word;
+                        this.vocabBox.searchField += this.selection[i].word;
                         if (this.selection[i].spaceAfter) {
-                            this.modernVocabBox.searchField += ' ';
+                            this.vocabBox.searchField += ' ';
                         }
 
                         if (this.selectedPhrase == -1) {
-                            this.modernVocabBox.reading += this.selection[i].reading;
+                            this.vocabBox.reading += this.selection[i].reading;
                         }
                     }
                 }
@@ -302,18 +592,165 @@
                 for (let wordIndex = 0; wordIndex < this.selection.length; wordIndex ++) {
                     var kanji = this.selection[wordIndex].kanji;
                     for (let kanjiIndex = 0; kanjiIndex < kanji.length; kanjiIndex ++) {
-                        if (this.modernVocabBox.kanjiList.indexOf(kanji[kanjiIndex]) === -1) {
-                            this.modernVocabBox.kanjiList.push(kanji[kanjiIndex]);
+                        if (this.vocabBox.kanjiList.indexOf(kanji[kanjiIndex]) === -1) {
+                            this.vocabBox.kanjiList.push(kanji[kanjiIndex]);
                         }
                     }
                 }
 
-                this.updateVocabBoxPosition();
-                // this.updateSelectedWordStage();
+                this.vocabBox.key ++;
+                this.updateVocabBoxPositionDelay();
+                this.hoverVocabBox.disabledWhileSelecting = false;
+            },
+            updateHoverVocabularyBox(data) {
+                if (!this.$props.vocabularyHoverBox || data.hoveredWords === null) {
+                    this.hoverVocabBox.dictionarySearchTerm = '';
+                    this.hoverVocabBox.hoveredWords = null;
+                    this.hoverVocabBox.active = false;
+                    this.hoverVocabBox.positionLeft = 0;
+                    this.hoverVocabBox.positionTop = 0;
+                    this.hoverVocabBox.userTranslation = '';
+                    this.hoverVocabBox.dictionaryTranslation = '';
+                    this.hoverVocabBox.deeplTranslation = '';
+
+                    this.hoverVocabBox.reading = '';
+                    this.hoverVocabBox.hoveredPhrase = -1;
+                    return;
+                } else {
+                    this.hoverVocabBox.hoveredWords = data.hoveredWords;
+                    this.hoverVocabBox.key ++;
+                    this.hoverVocabBox.hoveredPhrase = data.hoveredPhrase;
+                    this.hoverVocabBox.userTranslation = data.translation;
+                    this.hoverVocabBox.dictionaryTranslation = 'loading';
+                    this.hoverVocabBox.deeplTranslation = 'loading';
+                    this.hoverVocabBox.reading = data.reading;
+                    this.hoverVocabBox.active = true;
+
+                    // clear previous delay timeout 
+                    if (this.hoverVocabBox.dictionarySearchDelay !== null) {
+                        clearTimeout(this.hoverVocabBox.dictionarySearchDelay);
+                    }
+
+                    // call the hover vocabulary search function with a delay
+                    if (!this.$props.vocabularyHoverBoxSearch) {
+                        this.hoverVocabBox.dictionaryTranslation = '';
+                        this.hoverVocabBox.deeplTranslation = '';
+                    }
+
+                    this.hoverVocabBox.dictionarySearchDelay = setTimeout(() => {
+                        if (data.hoveredWords.length === 1) {
+                            var term = data.hoveredWords[0].word;
+                            if (data.hoveredWords[0].lemma.length) {
+                                term = this.trimSearchTerm(data.hoveredWords[0].lemma);
+                            }
+                        } else {
+
+                            // build search term for phrases, and adding spaces
+                            var term = '';
+                            for (let i = 0; i < data.hoveredWords.length; i++) {
+                                term += data.hoveredWords[i].word;
+                                
+                                if (data.hoveredWords[i].spaceAfter && i < data.hoveredWords.length - 1) {
+                                    term += ' ';
+                                }
+                            }
+
+                            data.hoveredWords.map(hoveredWord => hoveredWord.word).join('');
+                        }
+                        
+                        this.makeHoverVocabularyBoxSearchRequest(term);
+                    }, 300);
+                }
+
+                var margin = 8;
+                var hoverVocabBoxWidth = 300;
+                var vocabBoxAreaElement = document.getElementsByClassName('vocab-box-area')[0];
+                var vocabBoxArea = vocabBoxAreaElement.getBoundingClientRect();
+
+
+                if (data.hoveredWords.length == 1) {
+                    var hoveredWordPositions = document.querySelector('.text-block [wordindex="' + data.hoveredWords[0].wordIndex + '"]').getBoundingClientRect();
+                } else {
+                    var hoveredWordPositions = document.querySelector('.text-block [wordindex="' + data.hoveredWords[parseInt(data.hoveredWords.length / 2)].wordIndex + '"]').getBoundingClientRect();
+                }
+
+                var hoveredWordPositions = document.querySelector('.text-block [wordindex="' + data.hoveredWords[0].wordIndex + '"]').getBoundingClientRect();
+                
+                this.hoverVocabBox.positionLeft = hoveredWordPositions.right - vocabBoxArea.left - hoverVocabBoxWidth / 2 - (hoveredWordPositions.right - hoveredWordPositions.left) / 2;
+                if (this.hoverVocabBox.positionLeft < margin) {
+                    this.hoverVocabBox.positionLeft = margin;
+                } else if (this.hoverVocabBox.positionLeft > vocabBoxArea.right - vocabBoxArea.left - hoverVocabBoxWidth - margin) {
+                    this.hoverVocabBox.positionLeft = vocabBoxArea.right - vocabBoxArea.left - hoverVocabBoxWidth - margin;
+                }
+
+                this.hoverVocabBox.positionTop = hoveredWordPositions.bottom - vocabBoxArea.top + vocabBoxAreaElement.scrollTop + 25;
+            },
+            makeHoverVocabularyBoxSearchRequest(term) {
+                if (!this.$props.vocabularyHoverBoxSearch) {
+                    this.hoverVocabBox.dictionaryTranslation = '';
+                    this.hoverVocabBox.deeplTranslation = '';
+                }
+
+                // do not make search request for empty string
+                if (term === '') {
+                    return;
+                }
+
+                term = term.toLowerCase();
+                this.hoverVocabBox.dictionarySearchTerm = term;
+
+
+                // make dictionary search
+                axios.post('/dictionary/search-for-hover-vocabulary', {
+                    language: this.$props.language,
+                    term: term
+                }).then((response) => {
+                    // return if a different word has been selected  
+                    // after the request was sent
+                    if (this.hoverVocabBox.dictionarySearchTerm !== response.data.term) {
+                        return;
+                    }
+
+                    // return if there is no word selected anymore
+                    if (this.hoverVocabBox.dictionarySearchTerm === '') {
+                        return;
+                    }
+
+                    this.hoverVocabBox.key ++;
+                    this.hoverVocabBox.dictionaryTranslation = response.data.definitions.join(';');
+                });
+
+                // make deepl search
+                axios.post('/dictionaries/deepl/search', {
+                    language: this.$props.language,
+                    term: term
+                }).then((response) => {
+                    // return if a different word has been selected  
+                    // after the request was sent
+                    if (this.hoverVocabBox.dictionarySearchTerm !== response.data.term) {
+                        return;
+                    }
+
+                    // return if there is no word selected anymore
+                    if (this.hoverVocabBox.dictionarySearchTerm === '') {
+                        return;
+                    }
+
+                    this.hoverVocabBox.key ++;
+                    this.hoverVocabBox.deeplTranslation = response.data.definition;
+                }).catch(() => {
+                    this.hoverVocabBox.key ++;
+                    this.hoverVocabBox.deeplTranslation = 'DeepL error';
+                });
             },
             startSelection() {
+                this.hoverVocabBox.disabledWhileSelecting = true;
                 if (this.$refs.vocabularyBox !== undefined) {
                     this.$refs.vocabularyBox.inputChanged();
+                }
+
+                if (this.$refs.vocabularySideBox !== undefined) {
+                    this.$refs.vocabularySideBox.inputChanged();
                 }
 
                 if (this.selection.length == 1) {
@@ -322,10 +759,10 @@
                     this.savePhrase();
                 }
                 
-                this.modernVocabBox.active = false;
+                this.vocabBox.active = false;
             },
             unselectAllWords() {
-                this.modernVocabBox.active = false;
+                this.vocabBox.active = false;
                 if (this.selection.length == 1) {
                     this.saveWord();
                 } else if (this.selectedPhrase !== -1) {
@@ -336,57 +773,45 @@
                 this.selection = [];
                 
                 this.unselectAllWordsProcess();
-                this.$forceUpdate();
+                this.hoverVocabBox.disabledWhileSelecting = false;
+                this.textBlockKey ++;
             },
             unselectAllWordsProcess() {
                 this.selectedPhrase = -1;
                 this.selection = [];
-                this.modernVocabBox.kanjiList = [];
-                this.modernVocabBox.word = '';
-                this.modernVocabBox.phrase = '';
-                this.modernVocabBox.searchField = '';
-                this.modernVocabBox.translationText = '';
-                this.modernVocabBox.reading = '';
-                this.modernVocabBox.baseWord = '';
-                this.modernVocabBox.baseWordReading = '';
+                this.vocabBox.key ++;
+                this.vocabBox.kanjiList = [];
+                this.vocabBox.stage = 2;
+                this.vocabBox.type = 'empty';
+                this.vocabBox.word = '';
+                this.vocabBox.phrase = [];
+                this.vocabBox.searchField = '';
+                this.vocabBox.translationText = '';
+                this.vocabBox.reading = '';
+                this.vocabBox.baseWord = '';
+                this.vocabBox.baseWordReading = '';
                 
-                for (let j = 0; j < this.textBlocks.length; j++) {
-                    this.unselectWordInTextBlock(j);
-                    for (let i  = 0; i < this.textBlocks[j].words.length; i++) {
-                        this.textBlocks[j].words[i].selected = false;
-                        this.textBlocks[j].words[i].hover = false;
-                    }
+                for(let i = 0; i < this.text.words.length; i++) {
+                    this.text.words[i].selected = false;
                 }
-            },
-            unselectWordInTextBlock(textBlockId) {
-                for (var i = 0; i < this.$children.length; i++) {
-                    if (this.$children[i].textBlockId === undefined) {
-                        continue;
-                    }
 
-                    if (this.$children[i].textBlockId === textBlockId) {
-                        this.$children[i].unselectWord();
-                    }
-                }
+                this.$refs.text.unselectWord();
             },
             updateLookupCount(type, word, phraseId) {
-                for (var i = 0; i < this.$children.length; i++) {
-                    if (this.$children[i].textBlockId === undefined) {
-                        continue;
-                    }
-
-                    if (type === 'word') {
-                        this.$children[i].updateWordLookupCount(word);
-                    } else {
-                        this.$children[i].updatePhraseLookupCount(phraseId);
-                    }
+                if (type === 'word') {
+                    this.$refs.text.updateWordLookupCount(word);
+                } else {
+                    this.$refs.text.updatePhraseLookupCount(phraseId);
                 }
-
             },
             updateSelectedWordLookupCount(id) {
 
             },
             addSelectedWordToAnki() {
+                if (this.selection.length === 0 || (this.selection.length > 1 && this.selectedPhrase === -1)) {
+                    return;
+                }
+
                 // get example sentence and add space. 
                 var exampleSentence = this.getExampleSentence(true);
                 var exampleSentenceText = '';
@@ -396,9 +821,9 @@
 
                 if (this.selection.length == 1) {
                     var data = {
-                        word: this.textBlocks[this.selectedTextBlock].uniqueWords[this.selection[0].uniqueWordIndex].word,
-                        reading: this.modernVocabBox.reading,
-                        translation: this.modernVocabBox.translationText,
+                        word: this.text.uniqueWords[this.selection[0].uniqueWordIndex].word,
+                        reading: this.vocabBox.reading,
+                        translation: this.vocabBox.translationText,
                         exampleSentence: exampleSentenceText,
                     };
                 } else {
@@ -412,8 +837,8 @@
                     
                     var data = {
                         word: wordsText,
-                        reading: this.modernVocabBox.reading,
-                        translation: this.modernVocabBox.translationText,
+                        reading: this.vocabBox.reading,
+                        translation: this.vocabBox.translationText,
                         exampleSentence: exampleSentenceText
                     };
                 }
@@ -452,7 +877,7 @@
                     id: -1,
                     stage: 0,
                     words: [],
-                    reading: this.modernVocabBox.reading,
+                    reading: this.vocabBox.reading,
                     translation: '',
                 };
 
@@ -465,64 +890,62 @@
                 }
 
                 // find all instance of the new phrase in the text
-                for (let j = 0; j < this.textBlocks.length; j++) {
-                    var phraseOccurences = [];
-                    for (var i = 0; i < this.textBlocks[j].words.length; i++) {
-                        // check if the current word is the start of the phrase
-                        if (this.textBlocks[j].words[i].word.toLowerCase() == phrase.words[0]) {
-                            phraseOccurences.push([
-                                {
-                                    word: this.textBlocks[j].words[i].word.toLowerCase(),
-                                    wordIndex: i,
-                                    newLineCount: 0
-                                }
-                            ]);
-                        }
-
-                        // check if the current word is the continuation of a phrase
-                        for (let p = 0 ; p < phraseOccurences.length; p++) {
-                            if (phraseOccurences[p].length == phrase.words.length) {
-                                continue;
+                var phraseOccurences = [];
+                for (var i = 0; i < this.text.words.length; i++) {
+                    // check if the current word is the start of the phrase
+                    if (this.text.words[i].word.toLowerCase() == phrase.words[0]) {
+                        phraseOccurences.push([
+                            {
+                                word: this.text.words[i].word.toLowerCase(),
+                                wordIndex: i,
+                                newLineCount: 0
                             }
-
-                            if (phrase.words[phraseOccurences[p].length] == this.textBlocks[j].words[i].word.toLowerCase() &&
-                                (i - 1) == phraseOccurences[p][phraseOccurences[p].length - 1].wordIndex + phraseOccurences[p][phraseOccurences[p].length - 1].newLineCount) {
-                                phraseOccurences[p].push({
-                                    word: this.textBlocks[j].words[i].word.toLowerCase(),
-                                    wordIndex: i,
-                                    newLineCount: 0
-                                });
-                            }
- 
-                            // count 'NEWLINE' words for comparison
-                            if (this.textBlocks[j].words[i].word.toLowerCase() == 'newline') {
-                                phraseOccurences[p][phraseOccurences[p].length - 1].newLineCount ++;
-                            }
-                        }
-
+                        ]);
                     }
 
-                    // mark all instance of the new phrase in the text
+                    // check if the current word is the continuation of a phrase
                     for (let p = 0 ; p < phraseOccurences.length; p++) {
-                        if (phraseOccurences[p].length < phrase.words.length) {
+                        if (phraseOccurences[p].length == phrase.words.length) {
                             continue;
                         }
 
-                        for (let i = 0; i < phraseOccurences[p].length; i++) {
-                            this.textBlocks[j].words[phraseOccurences[p][i].wordIndex].phraseIndexes.push(this.textBlocks[j].phrases.length);
+                        if (phrase.words[phraseOccurences[p].length] == this.text.words[i].word.toLowerCase() &&
+                            (i - 1) == phraseOccurences[p][phraseOccurences[p].length - 1].wordIndex + phraseOccurences[p][phraseOccurences[p].length - 1].newLineCount) {
+                            phraseOccurences[p].push({
+                                word: this.text.words[i].word.toLowerCase(),
+                                wordIndex: i,
+                                newLineCount: 0
+                            });
+                        }
+
+                        // count 'NEWLINE' words for comparison
+                        if (this.text.words[i].word.toLowerCase() == 'newline') {
+                            phraseOccurences[p][phraseOccurences[p].length - 1].newLineCount ++;
                         }
                     }
 
-                    this.textBlocks[j].phrases.push(JSON.parse(JSON.stringify(phrase)));
                 }
+
+                // mark all instance of the new phrase in the text
+                for (let p = 0 ; p < phraseOccurences.length; p++) {
+                    if (phraseOccurences[p].length < phrase.words.length) {
+                        continue;
+                    }
+
+                    for (let i = 0; i < phraseOccurences[p].length; i++) {
+                        this.text.words[phraseOccurences[p][i].wordIndex].phraseIndexes.push(this.text.phrases.length);
+                    }
+                }
+
+                this.text.phrases.push(JSON.parse(JSON.stringify(phrase)));
 
                 this.updatePhraseBorders();
                 this.selectedPhrase = this.getSelectedPhraseIndex();
 
                 this.updateSelectedWordStage();
-                this.updateVocabBoxPosition();
+                this.updateVocabBoxPositionDelay();
                 this.savePhrase();
-                this.modernVocabBox.type = 'phrase';
+                this.vocabBox.type = 'phrase';
             },
             getSelectedPhraseIndex() {
                 var phraseIndex = -1;
@@ -533,8 +956,8 @@
                 }
                 
 
-                for (let i = 0; i < this.textBlocks[this.selectedTextBlock].phrases.length; i++) {
-                    if (selectedText == this.textBlocks[this.selectedTextBlock].phrases[i].words.join('')) {
+                for (let i = 0; i < this.text.phrases.length; i++) {
+                    if (selectedText == this.text.phrases[i].words.join('')) {
                         phraseIndex = i;
                         break;
                     }
@@ -547,33 +970,28 @@
                     return;
                 }
 
-                var deletedPhraseId = this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].id;
-                for (var j  = 0; j < this.textBlocks.length; j++) {
-                    var deletedPhraseIndex = this.textBlocks[j].phrases.map(e => e.id).indexOf(deletedPhraseId);
-                    if (deletedPhraseIndex == -1) {
-                        continue;
-                    }
-                    
-                    for (var i  = 0; i < this.textBlocks[j].words.length; i++) {
-                        // remove phrase index from words
-                        for (var p = this.textBlocks[j].words[i].phraseIndexes.length - 1; p >= 0; p--) {
-                            if (this.textBlocks[j].words[i].phraseIndexes[p] == deletedPhraseIndex) {
-                                this.textBlocks[j].words[i].phraseIndexes.splice(p, 1);
-                                break;
-                            }
+                var deletedPhraseId = this.text.phrases[this.selectedPhrase].id;
+                var deletedPhraseIndex = this.text.phrases.map(e => e.id).indexOf(deletedPhraseId);
+                
+                for (var i  = 0; i < this.text.words.length; i++) {
+                    // remove phrase index from words
+                    for (var p = this.text.words[i].phraseIndexes.length - 1; p >= 0; p--) {
+                        if (this.text.words[i].phraseIndexes[p] == deletedPhraseIndex) {
+                            this.text.words[i].phraseIndexes.splice(p, 1);
+                            break;
                         }
+                    }
 
-                        // decrease phrase indexes larger than the deleted one
-                        for (var p = this.textBlocks[j].words[i].phraseIndexes.length - 1; p >= 0; p--) {
-                            if (this.textBlocks[j].words[i].phraseIndexes[p] > deletedPhraseIndex) {
-                                this.textBlocks[j].words[i].phraseIndexes[p] --;
-                            }
+                    // decrease phrase indexes larger than the deleted one
+                    for (var p = this.text.words[i].phraseIndexes.length - 1; p >= 0; p--) {
+                        if (this.text.words[i].phraseIndexes[p] > deletedPhraseIndex) {
+                            this.text.words[i].phraseIndexes[p] --;
                         }
                     }
-                    
-                    // delete phrase
-                    this.textBlocks[j].phrases.splice(deletedPhraseIndex, 1);
                 }
+                
+                // delete phrase
+                this.text.phrases.splice(deletedPhraseIndex, 1);
 
                 axios.post('/vocabulary/phrase/delete', {
                     id: deletedPhraseId
@@ -592,39 +1010,35 @@
                 }
 
                 this.phraseCurrentlySaving = true;
-                var selectedPhraseId = this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].id;
-                for (var j  = 0; j < this.textBlocks.length; j++) {
-                    for (var i  = 0; i < this.textBlocks[j].phrases.length; i++) {
-                        if (this.textBlocks[j].phrases[i].id == selectedPhraseId) {
-                            this.textBlocks[j].phrases[i].translation = this.modernVocabBox.translationText;
-                            this.textBlocks[j].phrases[i].reading = this.modernVocabBox.reading;
-                        }
+                var selectedPhraseId = this.text.phrases[this.selectedPhrase].id;
+                for (var i  = 0; i < this.text.phrases.length; i++) {
+                    if (this.text.phrases[i].id == selectedPhraseId) {
+                        this.text.phrases[i].translation = this.vocabBox.translationText;
+                        this.text.phrases[i].reading = this.vocabBox.reading;
                     }
                 }
                 
                 var saveData = {
-                    words: this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].words,
-                    reading: this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].reading,
-                    translation: this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].translation,
-                    lookup_count: this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].lookup_count,
+                    words: this.text.phrases[this.selectedPhrase].words,
+                    reading: this.text.phrases[this.selectedPhrase].reading,
+                    translation: this.text.phrases[this.selectedPhrase].translation,
+                    lookup_count: this.text.phrases[this.selectedPhrase].lookup_count,
                 };
 
-                if (this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].id == -1) {
-                    saveData.stage = this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].stage;
+                if (this.text.phrases[this.selectedPhrase].id == -1) {
+                    saveData.stage = this.text.phrases[this.selectedPhrase].stage;
                 } else {
-                    saveData.id = this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].id;
+                    saveData.id = this.text.phrases[this.selectedPhrase].id;
                 }
 
                 if (withStage) {
-                    saveData.stage = this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].stage;
+                    saveData.stage = this.text.phrases[this.selectedPhrase].stage;
                 }
 
                 axios.post('/vocabulary/phrase/save', saveData).then((response) => {
-                    for (let j = 0; j < this.textBlocks.length; j++) {
-                        for (let i = 0; i < this.textBlocks[j].phrases.length; i++) {
-                            if (this.textBlocks[j].phrases[i].id == -1) {
-                                this.textBlocks[j].phrases[i].id = parseInt(response.data);
-                            }
+                    for (let i = 0; i < this.text.phrases.length; i++) {
+                        if (this.text.phrases[i].id == -1) {
+                            this.text.phrases[i].id = parseInt(response.data);
                         }
                     }
 
@@ -640,74 +1054,69 @@
                 }
             },
             updatePhraseBorders() {
-                for (var j  = 0; j < this.textBlocks.length; j++) {
-                    for (var i = 0; i < this.textBlocks[j].words.length; i++) {
-                        if (this.textBlocks[j].words[i].phraseIndexes.length) {
-                            var lowestPhraseStage = 1000;
-                            for (let p = 0; p < this.textBlocks[j].words[i].phraseIndexes.length; p++) {
-                                if (parseInt(this.textBlocks[j].phrases[this.textBlocks[j].words[i].phraseIndexes[p]].stage) < lowestPhraseStage) {
-                                    lowestPhraseStage = parseInt(this.textBlocks[j].phrases[this.textBlocks[j].words[i].phraseIndexes[p]].stage);
-                                }
+                for (var i = 0; i < this.text.words.length; i++) {
+                    if (this.text.words[i].phraseIndexes.length) {
+                        var lowestPhraseStage = 1000;
+                        for (let p = 0; p < this.text.words[i].phraseIndexes.length; p++) {
+                            if (parseInt(this.text.phrases[this.text.words[i].phraseIndexes[p]].stage) < lowestPhraseStage) {
+                                lowestPhraseStage = parseInt(this.text.phrases[this.text.words[i].phraseIndexes[p]].stage);
                             }
+                        }
 
-                            this.textBlocks[j].words[i].phraseStage = lowestPhraseStage;
-                        }
-                        
-                        // phrase start
-                        this.textBlocks[j].words[i].phraseStart = false;
-                        this.textBlocks[j].words[i].phraseEnd = false;
-                        if (this.textBlocks[j].words[i].phraseIndexes.length && (i == 0 || !this.textBlocks[j].words[i - 1].phraseIndexes.length)) {
-                            this.textBlocks[j].words[i].phraseStart = true;
-                        }
-                        
-                        // phrase end
-                        if (this.textBlocks[j].words[i].phraseIndexes.length && (i + 1 == this.textBlocks[j].words.length || !this.textBlocks[j].words[i + 1].phraseIndexes.length)) {
-                            this.textBlocks[j].words[i].phraseEnd = true;
-                        }
+                        this.text.words[i].phraseStage = lowestPhraseStage;
+                    }
+                    
+                    // phrase start
+                    this.text.words[i].phraseStart = false;
+                    this.text.words[i].phraseEnd = false;
+                    if (this.text.words[i].phraseIndexes.length && (i == 0 || !this.text.words[i - 1].phraseIndexes.length)) {
+                        this.text.words[i].phraseStart = true;
+                    }
+                    
+                    // phrase end
+                    if (this.text.words[i].phraseIndexes.length && (i + 1 == this.text.words.length || !this.text.words[i + 1].phraseIndexes.length)) {
+                        this.text.words[i].phraseEnd = true;
                     }
                 }
             },
             updateVocabBoxData(newVocabBoxData) {
-                this.modernVocabBox.reading = newVocabBoxData.reading;
-                this.modernVocabBox.baseWord = newVocabBoxData.baseWord;
-                this.modernVocabBox.baseWordReading = newVocabBoxData.baseWordReading;
-                this.modernVocabBox.phraseReading = newVocabBoxData.phraseReading;
-                this.modernVocabBox.translationText = newVocabBoxData.translationText;
+                this.vocabBox.reading = newVocabBoxData.reading;
+                this.vocabBox.baseWord = newVocabBoxData.baseWord;
+                this.vocabBox.baseWordReading = newVocabBoxData.baseWordReading;
+                this.vocabBox.phraseReading = newVocabBoxData.phraseReading;
+                this.vocabBox.translationText = newVocabBoxData.translationText;
                 
                 this.$forceUpdate();
             },
             saveWord(withStage = false, exampleSentenceChanged = false) {
-                var selectedWord = this.textBlocks[this.selectedTextBlock].uniqueWords[this.selection[0].uniqueWordIndex];
+                var selectedWord = this.text.uniqueWords[this.selection[0].uniqueWordIndex];
                 
 
                 // update unique words in all blocks
-                for (var j  = 0; j < this.textBlocks.length; j++) {
-                    for (var i  = 0; i < this.textBlocks[j].uniqueWords.length; i++) {
-                        if (this.textBlocks[j].uniqueWords[i].word.toLowerCase() == selectedWord.word.toLowerCase()) {
-                            this.textBlocks[j].uniqueWords[i].translation = this.modernVocabBox.translationText;
-                            this.textBlocks[j].uniqueWords[i].reading = this.modernVocabBox.reading;
-                            this.textBlocks[j].uniqueWords[i].base_word = this.modernVocabBox.baseWord;
-                            this.textBlocks[j].uniqueWords[i].base_word_reading = this.modernVocabBox.baseWordReading;
-                            this.textBlocks[j].uniqueWords[i].stage = selectedWord.stage;
-                        }
+                for (var i  = 0; i < this.text.uniqueWords.length; i++) {
+                    if (this.text.uniqueWords[i].word.toLowerCase() == selectedWord.word.toLowerCase()) {
+                        this.text.uniqueWords[i].translation = this.vocabBox.translationText;
+                        this.text.uniqueWords[i].reading = this.vocabBox.reading;
+                        this.text.uniqueWords[i].base_word = this.vocabBox.baseWord;
+                        this.text.uniqueWords[i].base_word_reading = this.vocabBox.baseWordReading;
+                        this.text.uniqueWords[i].stage = selectedWord.stage;
                     }
                 }
 
                 // update stages in all text
-                for (var j  = 0; j < this.textBlocks.length; j++) {
-                    for (var i  = 0; i < this.textBlocks[j].words.length; i++) {
-                        if (this.textBlocks[j].words[i].word.toLowerCase() == selectedWord.word.toLowerCase()) {
-                            this.textBlocks[j].words[i].stage = selectedWord.stage;
-                        }
+                for (var i  = 0; i < this.text.words.length; i++) {
+                    if (this.text.words[i].word.toLowerCase() == selectedWord.word.toLowerCase()) {
+                        this.text.words[i].stage = selectedWord.stage;
+                        this.text.words[i].furigana = this.vocabBox.reading;
                     }
                 }
                 
                 var saveData = {
                     id: selectedWord.id,
-                    translation: this.modernVocabBox.translationText,
-                    reading: this.modernVocabBox.reading,
-                    base_word: this.modernVocabBox.baseWord,
-                    base_word_reading: this.modernVocabBox.baseWordReading,
+                    translation: this.vocabBox.translationText,
+                    reading: this.vocabBox.reading,
+                    base_word: this.vocabBox.baseWord,
+                    base_word_reading: this.vocabBox.baseWordReading,
                     example_sentence: selectedWord.example_sentence,
                     lookup_count: selectedWord.lookup_count,
                 };
@@ -730,35 +1139,71 @@
                 this.$forceUpdate();
             },
             setStage(stage) {
+                var hoverSetStage = false;
+                
+                // do not set selected phrases to ignored
+                if (this.selection.length > 1 && stage === 1) {
+                    return;
+                }
+
+                if (!this.selection.length && this.hoverVocabBox.hoveredWords !== null) {
+                    hoverSetStage = true;
+
+                    // do not set hovered phrases to ignored
+                    if (this.hoverVocabBox.hoveredWords.length > 1 && stage === 1) {
+                        return;
+                    }
+
+                    // select hovered word and click on it
+                    for (let i = 0; i < this.hoverVocabBox.hoveredWords.length; i++) {
+                        if (!this.hoverVocabBox.hoveredWords[i].hover) {
+                            continue;
+                        }
+                    
+                        var wordElement = document.querySelector('.text-block [wordindex="' + this.hoverVocabBox.hoveredWords[0].wordIndex + '"]');
+                        var mouseDownEvent = new CustomEvent('mousedown', {cancelable: true});
+                        var mouseUpEvent = new CustomEvent('mouseup', {cancelable: true});
+                        wordElement.dispatchEvent(mouseDownEvent);
+                        wordElement.dispatchEvent(mouseUpEvent);
+                        break;
+                    }
+                }
+
+                if (!this.selection.length || (this.selection.length > 1 && this.selectedPhrase === -1)) {
+                    return;
+                }
+
                 // determine if saving is needed
                 var save = 'none';
-                if (this.selection.length == 1 && this.textBlocks[this.selectedTextBlock].uniqueWords[this.selection[0].uniqueWordIndex].stage !== stage) {
+                if (this.selection.length == 1 && this.text.uniqueWords[this.selection[0].uniqueWordIndex].stage !== stage) {
                     save = 'word';
-                } else if (this.selection.length > 1 && this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].stage !== stage) {
+                } else if (this.selection.length > 1 && this.text.phrases[this.selectedPhrase].stage !== stage) {
                     save = 'phrase';
                 }
 
                 if (this.selectedPhrase == -1 && this.selection.length == 1) {
-                    this.textBlocks[this.selectedTextBlock].uniqueWords[this.selection[0].uniqueWordIndex].stage = stage;
                     if (stage == 0) {
                         this.learnedWords ++;
                     }
 
+                    // set stage for all unique words that match the selected word
+                    for (var i  = 0; i < this.text.uniqueWords.length; i++) {
+                        if (this.text.uniqueWords[i].word == this.selection[0].word.toLowerCase()) {
+                            this.text.uniqueWords[i].stage = stage;
+                        }
+                    }
+
                     // set stage for all words that match the selected word
-                    for (var j  = 0; j < this.textBlocks.length; j++) {
-                        for (var i  = 0; i < this.textBlocks[j].words.length; i++) {
-                            if (this.textBlocks[j].words[i].word.toLowerCase() == this.selection[0].word.toLowerCase()) {
-                                this.textBlocks[j].words[i].stage = stage;
-                            }
+                    for (var i  = 0; i < this.text.words.length; i++) {
+                        if (this.text.words[i].word.toLowerCase() == this.selection[0].word.toLowerCase()) {
+                            this.text.words[i].stage = stage;
                         }
                     }
                 } else if (this.selectedPhrase !== -1) {
                     // set stage for all phrases that match the selected word
-                    for (var j  = 0; j < this.textBlocks.length; j++) {
-                        for (var i  = 0; i < this.textBlocks[j].phrases.length; i++) {
-                            if (this.textBlocks[j].phrases[i].id == this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].id) {
-                                this.textBlocks[j].phrases[i].stage = stage;
-                            }
+                    for (var i  = 0; i < this.text.phrases.length; i++) {
+                        if (this.text.phrases[i].id == this.text.phrases[this.selectedPhrase].id) {
+                            this.text.phrases[i].stage = stage;
                         }
                     }
                     
@@ -766,7 +1211,7 @@
                 }
 
                 // add word/phrase to anki
-                if (this.ankiAutoAddCards && stage < 0 && (this.modernVocabBox.stage >= 0 || this.modernVocabBox.stage === undefined)) {
+                if (this.ankiAutoAddCards && stage < 0 && (this.vocabBox.stage >= 0 || this.vocabBox.stage === undefined)) {
                     this.addSelectedWordToAnki();
                 }
                 
@@ -779,17 +1224,22 @@
                     this.savePhrase(true, stage < 0);
                 }
 
-                this.modernVocabBox.stage = stage;
+                this.vocabBox.stage = stage;
+
+                // unselect word if it was hovered
+                if (hoverSetStage) {
+                    this.unselectAllWords();
+                }
             },
             updateSelectedWordStage() {
                 if (this.selectedPhrase == -1 && this.selection.length) {
-                    this.modernVocabBox.stage = parseInt(this.textBlocks[this.selectedTextBlock].uniqueWords[this.selection[0].uniqueWordIndex].stage);
+                    this.vocabBox.stage = parseInt(this.text.uniqueWords[this.selection[0].uniqueWordIndex].stage);
                 } else if (this.selectedPhrase !== -1){
-                    this.modernVocabBox.stage = parseInt(this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].stage);
+                    this.vocabBox.stage = parseInt(this.text.phrases[this.selectedPhrase].stage);
                 }
 
-                if (this.modernVocabBox.stage == 2) {
-                    this.modernVocabBox.stage = undefined;
+                if (this.vocabBox.stage == 2) {
+                    this.vocabBox.stage = undefined;
                 }
             },
             getExampleSentence(withSpaces = false) {
@@ -801,18 +1251,18 @@
                 }
 
                 var exampleSentence = [];
-                for (var i = 0; i < this.textBlocks[this.selectedTextBlock].words.length; i++) {
-                    if (this.textBlocks[this.selectedTextBlock].words[i].word == 'NEWLINE' 
-                        || sentenceIndexes.indexOf(this.textBlocks[this.selectedTextBlock].words[i].sentence_index) == -1) {
+                for (var i = 0; i < this.text.words.length; i++) {
+                    if (this.text.words[i].word == 'NEWLINE' 
+                        || sentenceIndexes.indexOf(this.text.words[i].sentence_index) == -1) {
                         continue;
                     }
 
                     exampleSentence.push({
-                        word: this.textBlocks[this.selectedTextBlock].words[i].word,
+                        word: this.text.words[i].word,
                         phrase_ids: []
                     });
 
-                    if (withSpaces && this.textBlocks[this.selectedTextBlock].words[i].spaceAfter) {
+                    if (withSpaces && this.text.words[i].spaceAfter) {
                         exampleSentence[exampleSentence.length - 1].word += ' ';
                     }
                 }
@@ -823,10 +1273,10 @@
                 var exampleSentence = this.getExampleSentence();
 
                 var targetType = this.selection.length > 1 ? 'phrase' : 'word';
-                var targetId = this.textBlocks[this.selectedTextBlock].uniqueWords[this.selection[0].uniqueWordIndex].id;
+                var targetId = this.text.uniqueWords[this.selection[0].uniqueWordIndex].id;
 
                 if (targetType == 'phrase') {
-                    targetId = this.textBlocks[this.selectedTextBlock].phrases[this.selectedPhrase].id;
+                    targetId = this.text.phrases[this.selectedPhrase].id;
                 }
 
                 axios.post('/vocabulary/save-example-sentence', {
@@ -835,33 +1285,48 @@
                     exampleSentenceWords: JSON.stringify(exampleSentence),
                 });
             },
+            updateVocabBoxPositionDelay() {
+                this.$nextTick(() => {
+                    this.updateVocabBoxPosition();
+                });
+            },
             updateVocabBoxPosition() {
                 var margin = 8;
-                this.modernVocabBox.width = 400;
+                this.vocabBox.width = 400;
+                var vocabBoxAreaElement = document.getElementsByClassName('vocab-box-area')[0];
+                var vocabBoxArea = vocabBoxAreaElement.getBoundingClientRect();
+                
+
+                // update sidebar
+                if (this.$props.vocabularySidebarFits && this.$props.vocabularySidebar) {
+                    this.vocabBox.sidebarHidden = false;
+                    this.vocabBox.height = vocabBoxAreaElement.offsetHeight;
+                    this.vocabBox.positionLeft = vocabBoxArea.right;
+                    this.vocabBox.positionTop = vocabBoxArea.top;
+                    return;
+                }
 
                 if (!this.selection.length) {
                     return;
                 }
 
-                var vocabBoxAreaElement = document.getElementsByClassName('vocab-box-area')[0];
-                var vocabBoxArea = vocabBoxAreaElement.getBoundingClientRect();
                 if (this.selection.length == 1) {
-                    var selectedWordPositions = document.querySelector('[textblock="' + this.selectedTextBlock + '"] [wordindex="' + this.selection[0].wordIndex + '"]').getBoundingClientRect();
+                    var selectedWordPositions = document.querySelector('.text-block [wordindex="' + this.selection[0].wordIndex + '"]').getBoundingClientRect();
                 } else if (this.selection.length > 1) {
-                    var selectedWordPositions = document.querySelector('[textblock="' + this.selectedTextBlock + '"] [wordindex="' + this.selection[parseInt(this.selection.length / 2)].wordIndex + '"]').getBoundingClientRect();
+                    var selectedWordPositions = document.querySelector('.text-block [wordindex="' + this.selection[parseInt(this.selection.length / 2)].wordIndex + '"]').getBoundingClientRect();
                 }
 
-                this.modernVocabBox.positionLeft = selectedWordPositions.right - vocabBoxArea.left - this.modernVocabBox.width / 2 - (selectedWordPositions.right - selectedWordPositions.left) / 2;
+                this.vocabBox.positionLeft = selectedWordPositions.right - vocabBoxArea.left - this.vocabBox.width / 2 - (selectedWordPositions.right - selectedWordPositions.left) / 2;
 
                 if (window.innerWidth  < 440) {
-                    this.modernVocabBox.positionLeft = 0;
-                } else if (this.modernVocabBox.positionLeft < margin) {
-                    this.modernVocabBox.positionLeft = margin;
-                } else if (this.modernVocabBox.positionLeft > vocabBoxArea.right - vocabBoxArea.left - this.modernVocabBox.width - margin) {
-                    this.modernVocabBox.positionLeft = vocabBoxArea.right - vocabBoxArea.left - this.modernVocabBox.width - margin;
+                    this.vocabBox.positionLeft = 0;
+                } else if (this.vocabBox.positionLeft < margin) {
+                    this.vocabBox.positionLeft = margin;
+                } else if (this.vocabBox.positionLeft > vocabBoxArea.right - vocabBoxArea.left - this.vocabBox.width - margin) {
+                    this.vocabBox.positionLeft = vocabBoxArea.right - vocabBoxArea.left - this.vocabBox.width - margin;
                 }
 
-                this.modernVocabBox.positionTop = selectedWordPositions.bottom - vocabBoxArea.top + 15;
+                this.vocabBox.positionTop = selectedWordPositions.bottom - vocabBoxArea.top + vocabBoxAreaElement.scrollTop + 25;
 
                 this.scrollToVocabBox();
             },
@@ -877,42 +1342,38 @@
                     }
                 }, 450);
             },
-            openVocabBoxEditPage() {
-                this.makeSearchRequest();
-                this.vocabBox.tab = 1;
-                setTimeout(this.scrollToVocabBox, 120);
-            },
             trimSearchTerm(searchTerm) {
+                searchTerm = searchTerm.toLowerCase();
                 var trimmedSearchTerm = searchTerm;
 
                 // norwegian
-                if (this.$props.language == 'norwegian' && this.modernVocabBox.searchField.substring(0, 2) == 'å ') {
-                    trimmedSearchTerm = this.modernVocabBox.searchField.slice(2);
+                if (this.$props.language == 'norwegian' && searchTerm.substring(0, 2) == 'å ') {
+                    trimmedSearchTerm = searchTerm.slice(2);
                 }
 
-                if (this.$props.language == 'norwegian' && this.modernVocabBox.searchField.substring(0, 3) == 'et ') {
-                    trimmedSearchTerm = this.modernVocabBox.searchField.slice(3);
+                if (this.$props.language == 'norwegian' && searchTerm.substring(0, 3) == 'et ') {
+                    trimmedSearchTerm = searchTerm.slice(3);
                 }
 
-                if (this.$props.language == 'norwegian' && this.modernVocabBox.searchField.substring(0, 3) == 'en ') {
-                    trimmedSearchTerm = this.modernVocabBox.searchField.slice(3);
+                if (this.$props.language == 'norwegian' && searchTerm.substring(0, 3) == 'en ') {
+                    trimmedSearchTerm = searchTerm.slice(3);
                 }
 
-                if (this.$props.language == 'norwegian' && this.modernVocabBox.searchField.substring(0, 3) == 'ei ') {
-                    trimmedSearchTerm = this.modernVocabBox.searchField.slice(3);
+                if (this.$props.language == 'norwegian' && searchTerm.substring(0, 3) == 'ei ') {
+                    trimmedSearchTerm = searchTerm.slice(3);
                 }
 
                 // german
-                if (this.$props.language == 'german' && this.modernVocabBox.searchField.substring(0, 4) == 'die ') {
-                    trimmedSearchTerm = this.modernVocabBox.searchField.slice(4);
+                if (this.$props.language == 'german' && searchTerm.substring(0, 4) == 'die ') {
+                    trimmedSearchTerm = searchTerm.slice(4);
                 }
 
-                if (this.$props.language == 'german' && this.modernVocabBox.searchField.substring(0, 4) == 'der ') {
-                    trimmedSearchTerm = this.modernVocabBox.searchField.slice(4);
+                if (this.$props.language == 'german' && searchTerm.substring(0, 4) == 'der ') {
+                    trimmedSearchTerm = searchTerm.slice(4);
                 }
 
-                if (this.$props.language == 'german' && this.modernVocabBox.searchField.substring(0, 4) == 'das ') {
-                    trimmedSearchTerm = this.modernVocabBox.searchField.slice(4);
+                if (this.$props.language == 'german' && searchTerm.substring(0, 4) == 'das ') {
+                    trimmedSearchTerm = searchTerm.slice(4);
                 }
 
                 return trimmedSearchTerm;

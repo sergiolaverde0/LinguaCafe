@@ -109,7 +109,7 @@
                         -->
 
                         <!-- Stage buttons-->
-                        <template v-if="type !== 'new-phrase'">
+                        <template v-if="$props.type !== 'new-phrase'">
                             <div class="vocab-box-subheader d-flex mb-2 mt-4">
                                 <span class="rounded-pill py-1 px-3">Level</span>
                                 <v-spacer />
@@ -150,7 +150,7 @@
                                 <v-btn 
                                     :class="{'v-btn--active': stage == 1}" 
                                     @click="setStage(1)" 
-                                    v-if="type == 'word'"
+                                    v-if="$props.type == 'word'"
                                 >
                                     <v-icon>mdi-close</v-icon>
                                 </v-btn>
@@ -168,77 +168,33 @@
                             hide-details
                             height="100"
                             v-model="translationText"
-                            @change="inputChanged"
+                            @change="inputChanged('translation')"
+                            @keydown.stop=";"
                         ></v-textarea>
 
-                        <!-- Search term -->
-                        <v-text-field 
-                            label="Dictionary search"
-                            class="mt-2 mb-3"
-                            filled
-                            dense
-                            rounded
-                            width="100%"
-                            hide-details
-                            v-model="searchField"
-                            @change="makeSearchRequest"
-                        ></v-text-field>
-
-                        <!-- Search results -->
-                        <div id="search-results" class="border rounded-lg">
-                            <div class="search-result jmdict" v-for="(searchResult, searchresultIndex) in searchResults" :key="searchresultIndex">
-                                <!-- Regular record -->
-                                <template v-if="searchResult.dictionary !== 'JMDict'">
-                                    <div v-for="(record, recordIndex) in searchResult.records" :key="recordIndex">
-                                        <div class="search-result-title rounded px-2" :style="{'background-color': searchResult.color}">{{ record.word }} <div class="dictionary"> {{ searchResult.dictionary}} </div></div>
-                                        <div 
-                                            v-for="(definition, definitionIndex) in record.definitions" 
-                                            :key="definitionIndex" 
-                                            class="search-result-definition rounded"
-                                            @click="addDefinitionToInput(definition)"
-                                        >
-                                            {{ definition }} <v-icon>mdi-plus</v-icon>
-                                        </div>
-                                    </div>
-                                </template>
-
-                                <!-- JMDict record -->
-                                <template v-if="searchResult.dictionary == 'JMDict'">
-                                    <div v-for="(record, recordIndex) in searchResult.records" :key="recordIndex">
-                                        <div class="search-result-title rounded px-2" :style="{'background-color': searchResult.color}">{{ record.word }} <div class="dictionary"> {{ searchResult.dictionary}} </div></div>
-                                        <div class="search-result-definition rounded" v-for="(definition, definitionIndex) in record.definitions" :key="definitionIndex" @click="addDefinitionToInput(definition)">
-                                            {{ definition }} <v-icon>mdi-plus</v-icon>
-                                        </div>
-                                    
-                                        <template v-if="record.otherForms.length">
-                                            <div class="vocab-box-subheader">Other forms:</div>
-                                            <div class="d-flex flex-wrap">
-                                                <div v-for="(form, formIndex) in record.otherForms" :key="formIndex">
-                                                    {{ form }}<span class="mr-2" v-if="formIndex < record.otherForms.length - 1">, </span>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
+                        <!-- Search box -->
+                        <vocabulary-search-box
+                            :language="$props.language"
+                            :_searchTerm="searchField"
+                            @addDefinitionToInput="addDefinitionToInput"
+                        ></vocabulary-search-box>
                     </v-card-text>
 
-                    <v-card-actions v-if="type !== 'word'" class="mt-2 pl-0">
+                    <v-card-actions v-if="$props.type !== 'word'" class="mt-2 pl-0">
                         <v-spacer />
                         <v-btn 
                             small
                             rounded
                             color="success"
                             @click="addNewPhrase"
-                            v-if="type == 'new-phrase'"
+                            v-if="$props.type == 'new-phrase'"
                         >Save phrase</v-btn>
                         <v-btn 
                             small
                             rounded
                             color="error"
                             @click="deletePhrase"
-                            v-if="type == 'phrase'"
+                            v-if="$props.type == 'phrase'"
                         >Delete phrase</v-btn>
                     </v-card-actions>
                 </v-tab-item>
@@ -247,7 +203,7 @@
                 <v-tab-item :value="1">
                     <v-card-text id="vocab-box-edit-page" class="pa-0">
                         <!-- Word text fields -->
-                        <div class="d-flex" v-if="type == 'word'">
+                        <div class="d-flex" v-if="$props.type == 'word'">
                             <v-text-field 
                                 :class="{'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}"
                                 hide-details
@@ -257,6 +213,7 @@
                                 rounded
                                 v-model="baseWord"
                                 @change="inputChanged"
+                                @keydown.stop=";"
                             ></v-text-field>
                             <v-text-field 
                                 :class="{'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}"
@@ -268,11 +225,12 @@
                                 rounded
                                 :value="word"
                                 @change="inputChanged"
+                                @keydown.stop=";"
                             ></v-text-field>
                         </div>
 
                         <!-- Reading fields -->
-                        <div class="d-flex" v-if="type == 'word' && ($props.language == 'japanese' || $props.language == 'chinese')">
+                        <div class="d-flex" v-if="$props.type == 'word' && ($props.language == 'japanese' || $props.language == 'chinese')">
                             <v-text-field 
                                 class="my-2"
                                 hide-details
@@ -282,6 +240,7 @@
                                 rounded
                                 v-model="baseWordReading"
                                 @change="inputChanged"
+                                @keydown.stop=";"
                             ></v-text-field>
                             <v-text-field 
                                 class="my-2"
@@ -292,12 +251,13 @@
                                 rounded
                                 v-model="reading"
                                 @change="inputChanged"
+                                @keydown.stop=";"
                             ></v-text-field>
                         </div>
 
                         <!-- Phrase fields -->
                         <v-textarea
-                            v-if="type !== 'word' && ($props.language == 'japanese' || $props.language == 'chinese')"
+                            v-if="$props.type !== 'word' && ($props.language == 'japanese' || $props.language == 'chinese')"
                             class="my-2"
                             label="Reading"
                             filled
@@ -308,6 +268,7 @@
                             height="100"
                             v-model="reading"
                             @change="inputChanged"
+                            @keydown.stop=";"
                         ></v-textarea>
                     </v-card-text>
                 </v-tab-item>
@@ -319,6 +280,8 @@
             <v-btn dark icon @click="close" title="Close"><v-icon>mdi-close</v-icon></v-btn>
             <v-btn dark icon @click="tab = 1;" title="Edit" v-if="tab == 0"><v-icon>mdi-pencil</v-icon></v-btn>
             <v-btn dark icon @click="tab = 0;" v-if="tab == 1" title="Back"><v-icon>mdi-arrow-left</v-icon></v-btn>
+
+            <!-- Options menu-->
             <v-menu left offset-y class="rounded-lg">
                 <template v-slot:activator="{ on, attrs }">
                     <v-btn dark icon v-bind="attrs" v-on="on" title="More options">
@@ -326,9 +289,9 @@
                     </v-btn>
                 </template>
                 <v-btn 
-                    v-if="type !== 'new-phrase'"
+                    v-if="$props.type !== 'new-phrase'"
                     class="menu-button justify-start" 
-                    @click="addSelectedWordToAnki"
+                    @mouseup.stop="addSelectedWordToAnki"
                 >
                     <v-icon class="mr-1">mdi-cards</v-icon>Send to anki
                 </v-btn>
@@ -340,6 +303,7 @@
 <script>
     export default {
         props: {
+            autoHighlightWords: Boolean,
             language: String,
             active: Boolean,
             type: String,
@@ -466,9 +430,9 @@
                 }
 
                 this.translationText += definition;
-                this.inputChanged();
+                this.inputChanged('translation');
             },
-            inputChanged() {
+            inputChanged(inputName = '') {
                 this.updateVocabBoxTranslationList();
 
                 this.$emit('updateVocabBoxData', {
@@ -478,6 +442,10 @@
                     phraseReading: this.phraseReading,
                     translationText: this.translationText
                 });
+
+                if (inputName == 'translation' && this.$props.stage >= 0 && this.$props.autoHighlightWords && this.translationText !== '') {
+                    this.setStage(-7);
+                }
             },
             unselectAllWords() {
                 this.$emit('unselectAllWords');

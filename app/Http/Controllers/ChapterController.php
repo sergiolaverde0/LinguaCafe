@@ -56,7 +56,7 @@ class ChapterController extends Controller
     }
 
     public function getChapterForEdit($chapterId) {
-        $chapter = Lesson::select(['name', 'raw_text'])->where('id', $chapterId)->where('user_id', Auth::user()->id)->first();
+        $chapter = Lesson::select(['name', 'raw_text', 'type'])->where('id', $chapterId)->where('user_id', Auth::user()->id)->first();
         $chapter->raw_text = str_replace(" NEWLINE \r\n", "\r\n", $chapter->raw_text);
         return $chapter;
     }
@@ -94,6 +94,8 @@ class ChapterController extends Controller
         $textBlock->indexPhrases();
 
         $data = new \stdClass();
+        $data->type = $lesson->type;
+        $data->subtitleTimestamps = $lesson->subtitle_timestamps;
         $data->words = $textBlock->words;
         $data->uniqueWords = $textBlock->uniqueWords;
         $data->phrases = $textBlock->phrases;
@@ -186,6 +188,8 @@ class ChapterController extends Controller
         // set lesson data from post data
         $lesson->user_id = Auth::user()->id;
         $lesson->name = $request->name;
+        $lesson->type = 'text';
+        $lesson->subtitle_timestamps = '';
         $lesson->read_count = isset($request->lesson_id) ? $lesson->read_count : 0;
         $lesson->word_count = 0;
         $lesson->book_id = $request->book;

@@ -3,7 +3,167 @@
         <div class="subheader">
             Patch notes
         </div>
-        
+       
+        <v-card outlined class="rounded-lg mb-8">
+            <v-card-title>v0.7 <v-spacer /> 2024.02.??.</v-card-title>
+            <v-card-text>
+                <b>New features:</b>
+                <ul>
+                    <li>
+                        Replaced the python Django server with Bottle for better performance.
+                    </li>
+                    <li>
+                        Added dynamic language model loading. Models are only going to be loaded at the first import for each language. This will significantly decrease memory use based on which and how many langauges are used on a server after its startup.
+                    </li>
+                    <li>
+                        Added new "Plain text" import option.
+                    </li>
+                    <li>
+                        Added new "Text file" import option.
+                    </li>
+                    <li>
+                        Added new "Jellyfin subtitle" import option.
+                    </li>
+                    <li>
+                        Added new "Subtitle file" import option.
+                    </li>
+                    <li>
+                        Setting words' and phrases' level is now possible while hovering over them.
+                    </li>
+                    <li>
+                        Added dictionary search for hover vocabulary box. 
+                    </li>
+                    <li>
+                        Added DeepL search for hover vocabulary box. 
+                    </li>
+                    <li>
+                        Separated DeepL search from regular dictionary search in the vocabulary box. Users won't have to wait for DeepL server's response to see the dictionary search results which load much faster.
+                    </li>
+                    <li>
+                        Added loading indicator for vocabulary box dictionary search.
+                    </li>
+                    <li>
+                        Added an option to automatically highlight a word when it gets a translation added to it. 
+                    </li>
+                    <li>
+                        A list of words which were not counted in the statistics now will be automatically set to ignored when imported. Also added all numbers and more symbols to the list.
+                    </li>
+                    <li>
+                        Vocabulary search page's edit dialog now will close on its own after saving it, and the search results will be updated automatically.
+                    </li>
+                    <li>
+                        Added chapter length option to import dialog.
+                    </li>
+                    <li>
+                        Added hotkeys for text scrolling.
+                    </li>
+                    <li>
+                        The selected library layout will now be remembered.
+                    </li>
+                    <li>
+                        Added option to change the default MySQL database and user.
+                    </li>
+                    <li>
+                        Added windows installation guide and installation file.
+                    </li>
+                </ul>
+                
+                <b>Bug fixes:</b>
+                <ul>
+                    <li>
+                        Fixed a bug that caused the records on the vocabulary search page to appear in random order inside the specified order by parameter.
+                    </li>
+                    <li>
+                        Fixed an issue in the text reader glossary, where empty parentheses were visible in languages that have no readings.
+                    </li>
+                    <li>
+                        Fixed a visual issue where the scrollbars' background were a different color than the area they were placed on.
+                    </li>
+                    <li>
+                        Fixed an issue that caused long chapter titles to hide the text.
+                    </li>
+                    <li>
+                        Furigana now displays the editable reading field. Previously it displayed the reading that was assigned to the exact word in text while importing it.
+                    </li>
+                    <li>
+                        Fixed a visual issue where the day text was not visible in the calendar while using dark theme.
+                    </li>
+                    <li>
+                        Added missing lemma to review card when using example sentence mode.
+                    </li>
+                    <li>
+                        Removed furigana from e-book imports.
+                    </li>
+                </ul>
+                
+                <b>Other changes:</b>
+                <ul>
+                    <li>
+                        Removed media player page, it has been replaced with Jellyfin subtitle import option.
+                    </li>
+                    <li>
+                        Improved text selecting design. 
+                    </li>
+                    <li>
+                        Removed unnecessary files from the webserver image and decreased its size.
+                    </li>
+                </ul>
+            </v-card-text>
+        </v-card>
+
+        <v-card outlined class="rounded-lg mb-8">
+            <v-card-title>v0.6 <v-spacer /> 2024.01.29.</v-card-title>
+            <v-card-text>
+                <b>New features:</b>
+                <ul>
+                    <li>
+                        Added an always open and fixed sidebar vocabulary as a default option for screens wider than 960px. It can be turned off in the text reader settings.
+                    </li>
+                    <li>
+                        Added a minimalistic vocabulary box, that appears when the user moves the mouse over a word. It can be turned off in the text reader settings.
+                    </li>
+                    <li>
+                        Added youtube subtitle import option.
+                    </li>
+                    <li>
+                        Added hotkeys for the text reader and review pages.
+                    </li>
+                    <li>
+                        Added proper finish reading screen.
+                    </li>
+                </ul>
+                
+                <b>Bug fixes:</b>
+                <ul>
+                    <li>
+                        Users clicking anywhere outside of the vocabulary box will close the vocabulary box. Previously it only worked if the user clicked on an empty space inside the text box.
+                    </li>
+                    <li>
+                        Increased maximum execution time for importing dictionaries. If your dictionary import did not end with a success message but still functional, I recommend importing it again, because it probably did not import all the records from the dictionary file.
+                    </li>
+                </ul>
+                
+                <b>Other changes:</b>
+                <ul>
+                    <li>
+                        Updated node.js to v20.11.0.
+                    </li>
+                </ul>
+            </v-card-text>
+        </v-card>
+
+        <v-card outlined class="rounded-lg mb-8">
+            <v-card-title>v0.5.2 <v-spacer /> 2024.01.23.</v-card-title>
+            <v-card-text>
+                <b>Bug fixes:</b>
+                <ul>
+                    <li>
+                        Fixed a problem with deployment, and added a simple migration guide.
+                    </li>
+                </ul>
+            </v-card-text>
+        </v-card>
+
         <v-card outlined class="rounded-lg mb-8">
             <v-card-title>v0.5.1 <v-spacer /> 2024.01.22.</v-card-title>
             <v-card-text>

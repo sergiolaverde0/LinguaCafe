@@ -65,7 +65,7 @@
                         class="menu-button justify-start" 
                         tile 
                         color="white"
-                        @click="layout = 'cover';"
+                        @click="setLayout('cover')"
                     >
                         <v-icon class="mr-1">mdi-view-module</v-icon>
                         Cover only
@@ -74,7 +74,7 @@
                         class="menu-button justify-start" 
                         tile 
                         color="white"
-                        @click="layout = 'detailed';"
+                        @click="setLayout('detailed')"
                     >
                         <v-icon class="mr-1">mdi-view-agenda</v-icon>
                         Detailed
@@ -263,6 +263,10 @@
         },
         mounted() {
             this.loadBooks();
+
+            if (this.$cookie.get('library-layout') !== null) {
+                this.layout = this.$cookie.get('library-layout');
+            }
         },
         methods: {
             loadBookWordCounts(bookId, index) {
@@ -320,13 +324,23 @@
                 for (let bookIndex = 0; bookIndex < this.books.length; bookIndex ++) {
                     if (bookId !== this.books[bookIndex].id) {
                         this.books[bookIndex].chaptersVisible = false;
+                        
                     } else {
                         this.anyChapterVisible = !this.books[bookIndex].chaptersVisible;
                         this.books[bookIndex].chaptersVisible = !this.books[bookIndex].chaptersVisible;
+
                         setTimeout(() => {
                             document.getElementById('book-' + bookId).scrollIntoView();
                         }, 500);
                     }
+                }
+
+                if (this.anyChapterVisible && this.$router.currentRoute.fullPath !== ('/books/' + bookId)) {
+                    this.$router.push('/books/' + bookId);
+                }
+
+                if (!this.anyChapterVisible && this.$router.currentRoute.fullPath !== ('/books')) {
+                    this.$router.push('/books');
                 }
             },
             showStartReviewDialog(bookId, bookName) {
@@ -347,7 +361,17 @@
                     }
 
                     this.books = response.data;
+
+                    if (this.$route.params.bookId !== undefined) {
+                        this.$nextTick(() => {
+                            this.toggleChapters(parseInt(this.$route.params.bookId));
+                        });
+                    } 
                 });
+            },
+            setLayout(newLayout) {
+                this.layout = newLayout;
+                this.$cookie.set('library-layout', newLayout, 3650);
             },
             formatNumber: formatNumber
         }

@@ -41,7 +41,7 @@ Route::group(['middleware' => ['auth', 'web']], function () {
     Route::get('/patch-notes', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/admin', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/media-player', [App\Http\Controllers\HomeController::class, 'index']);
-    Route::get('/books', [App\Http\Controllers\HomeController::class, 'index']);
+    Route::get('/books/{bookId?}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/book/create', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/chapters/{id}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/chapters/read/{id}', [App\Http\Controllers\HomeController::class, 'index']);
@@ -82,9 +82,11 @@ Route::group(['middleware' => ['auth', 'web']], function () {
     Route::post('/dictionaries/import', [App\Http\Controllers\DictionaryController::class, 'importSupportedDictionary']);
     Route::get('/dictionaries/get-record-count/{dictionaryName}', [App\Http\Controllers\DictionaryController::class, 'getDictionaryRecordCount']);
     Route::get('/dictionaries/deepl/get-usage', [App\Http\Controllers\DictionaryController::class, 'getDeeplCharacterLimit']);
+    Route::post('/dictionaries/deepl/search', [App\Http\Controllers\DictionaryController::class, 'searchDeepl']);
     Route::get('/dictionaries/get', [App\Http\Controllers\DictionaryController::class, 'getDictionaries']);
     Route::post('/dictionary/update', [App\Http\Controllers\DictionaryController::class, 'updateDictionary']);
     Route::post('/dictionary/search', [App\Http\Controllers\DictionaryController::class, 'searchDefinitions']);
+    Route::post('/dictionary/search-for-hover-vocabulary', [App\Http\Controllers\DictionaryController::class, 'searchDefinitionsForHoverVocabulary']);
     Route::post('/dictionary/search/inflections', [App\Http\Controllers\DictionaryController::class, 'searchInflections']);
     Route::post('/dictionary/test-csv-file', [App\Http\Controllers\DictionaryController::class, 'testDictionaryCsvFile']);
     Route::post('/dictionary/import-csv-file', [App\Http\Controllers\DictionaryController::class, 'importDictionaryCsvFile']);
@@ -130,4 +132,6 @@ Route::group(['middleware' => ['auth', 'web']], function () {
 
     // library import
     Route::post('/import', [App\Http\Controllers\ImportController::class, 'import']);
+    Route::post('/youtube/get-subtitle-list', [App\Http\Controllers\ImportController::class, 'getYoutubeSubtitles']);
+    Route::post('/youtube/get-subtitle-file-content', [App\Http\Controllers\ImportController::class, 'getSubtitleFileContent']);
 });

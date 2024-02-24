@@ -6,122 +6,99 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
+use App\Services\ImportService;
 use Illuminate\Http\Request;
-use App\Models\TextBlock;
-use App\Models\Lesson;
-use App\Models\Book;
 
 
 class ImportController extends Controller
 {
+    private $importMethods = [
+        'e-book' => 'e-book',
+        'jellyfin-subtitle' => 'subtitle',
+        'subtitle-file' => 'subtitle',
+        'plain-text' => 'text',
+        'text-file' => 'text',
+        'youtube' => 'text',
+    ];
 
     public function import(Request $request) {
         $userId = Auth::user()->id;
         $importType = $request->post('importType');
-        $importFile = $request->file('importFile');
         $textProcessingMethod = $request->post('textProcessingMethod');
         $bookId = $request->post('bookId');
         $bookName = $request->post('bookName');
         $chapterName = $request->post('chapterName');
+        $chunkSize = intval($request->post('maximumCharactersPerChapter'));
+        $importMethod = $this->importMethods[$importType];
 
+        if ($importMethod == 'e-book') {
+            $importFile = $request->file('importFile');
+        } else if ($importMethod == 'text') {
+            $importText = $request->post('importText');
+        } else if ($importMethod == 'subtitle') {
+            $importSubtitles = $request->post('importSubtitles');
+        }
+        
         // move file to temp folder
-        if ($importType === 'e-book') {
+        if (isset($importFile)) {
             $randomString = bin2hex(openssl_random_pseudo_bytes(30));
             $extension = '.' . $importFile->getClientOriginalExtension();
             $fileName = $userId . '_' . $randomString . $extension;
             $importFile->move(storage_path('app/temp'), $fileName);
         }
 
-        // import text
+        // import
         try {
-            $this->importBook($textProcessingMethod, storage_path('app/temp') . '/' . $fileName, $bookId, $bookName, $chapterName);
+            if ($importMethod === 'e-book') {
+                // e-book
+                (new ImportService())->importBook($chunkSize, $textProcessingMethod, storage_path('app/temp') . '/' . $fileName, $bookId, $bookName, $chapterName);
+            } else if ($importMethod === 'text') {
+                // text
+                (new ImportService())->importText($chunkSize, $textProcessingMethod, $importText, $bookId, $bookName, $chapterName);
+            } else if ($importMethod === 'subtitle') {
+                // text
+                (new ImportService())->importSubtitles($chunkSize, $textProcessingMethod, $importSubtitles, $bookId, $bookName, $chapterName);
+            }
         } catch (\Exception $exception) {
-            File::delete(storage_path('app/temp') . '/' . $fileName);
-            return 'error';
+            // delete temp file
+            if (isset($importFile)) {
+                File::delete(storage_path('app/temp') . '/' . $fileName);
+            }
+
+            return $exception;
         }
 
         // delete temp file
-        if ($importType === 'e-book') {
+        if (isset($importFile)) {
             File::delete(storage_path('app/temp') . '/' . $fileName);
         }
 
         return 'success';
     }
 
-    private function importBook($textProcessingMethod, $file, $bookId, $bookName, $chapterName) {
-        DB::disableQueryLog();
-        $userId = Auth::user()->id;
-        $selectedLanguage = Auth::user()->selected_language;
+    public function getYoutubeSubtitles(Request $request) {
+        $url = $request->post('url');
+        $subtitleList = (new ImportService())->getYoutubeSubtitles($url);
 
-        // tokenize book
-        $text = Http::post('linguacafe-python-service:8678/tokenizer/import', [
-            'language' => $selectedLanguage,
-            'textProcessingMethod' => $textProcessingMethod,
-            'importFile' => $file,
-            'chunkSize' => 4000
-        ]);
-        
-        // get text and token chunks
-        $text = json_decode($text);
-        $chunks = $text->processedChunks;
-        $textChunks = $text->textChunks;
+        return $subtitleList;
+    }
 
-        // retrieve or create book
-        if ($bookId == -1) {
-            $book = new Book();
-            $book->user_id = $userId;
-            $book->cover_image = 'default.jpg';
-            $book->language = $selectedLanguage;
-            $book->name = $bookName;
-            $book->save();
-        } else {
-            $book = Book
-                ::where('user_id', $userId)
-                ->where('id', $bookId)
-                ->first();
-            
-            if (!$book) {
-                return 'error';
-            }
-        }
+    public function getSubtitleFileContent(Request $request) {
+        $subtitleFile = $request->file('subtitleFile');
+        $userId = Auth::user()->id;        
 
-        // import each chunk as a chapter
-        foreach ($chunks as $chunkIndex => $chunk) {
-            $lesson = new Lesson();
-            $lesson->user_id = $userId;
-            $lesson->name = $chapterName . ' ' . ($chunkIndex + 1);
-            $lesson->read_count = 0;
-            $lesson->word_count = 0;
-            $lesson->book_id = $book->id;
-            $lesson->language = $selectedLanguage;
-            $lesson->raw_text = $textChunks[$chunkIndex];
-            $lesson->unique_words = '';
-            $lesson->setProcessedText([]);
+        // move file to temp folder
+        $randomString = bin2hex(openssl_random_pseudo_bytes(30));
+        $extension = '.' . $subtitleFile->getClientOriginalExtension();
+        $fileName = $userId . '_' . $randomString . $extension;
+        $subtitleFile->move(storage_path('app/temp'), $fileName);
 
-            $textBlock = new TextBlock();
-            $textBlock->tokenizedWords = $chunk;
-            $textBlock->processTokenizedWords();
-            $textBlock->collectUniqueWords();
-            $textBlock->updateAllPhraseIds();
-            $textBlock->createNewEncounteredWords();
-            
-            $uniqueWordIds = DB
-                ::table('encountered_words')
-                ->select('id')
-                ->where('user_id', Auth::user()->id)
-                ->where('language', $selectedLanguage)
-                ->whereIn('word', $textBlock->uniqueWords)
-                ->pluck('id')
-                ->toArray();
+        // get subtitle content
+        $subtitleContent = (new ImportService())->getSubtitleFileContent(storage_path('app/temp') . '/' . $fileName);
 
-            // update lesson word data
-            $lesson->setProcessedText($textBlock->processedWords);
-            $lesson->word_count = $textBlock->getWordCount();
-            $lesson->unique_words = json_encode($textBlock->uniqueWords);
-            $lesson->unique_word_ids = json_encode($uniqueWordIds);
-            $lesson->save();
-        }
+        // delete temp file
+        File::delete(storage_path('app/temp') . '/' . $fileName);
 
-        return 'success';
+        return $subtitleContent;
     }
 }
