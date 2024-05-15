@@ -22,6 +22,7 @@ import importlib
 import shutil
 import subprocess
 from newspaper import Article
+import spacy_stanza
 
 # create emtpy sapce models
 multi_nlp = None
@@ -71,7 +72,7 @@ def getTokenizerDoc(language, words):
     if language == 'german':
         global german_nlp
         if german_nlp == None:
-            german_nlp = spacy.load("de_core_news_sm", disable = ['ner'])
+            german_nlp = spacy_stanza.load_pipeline("de", processors = "tokenize, lemma")
             german_nlp.add_pipe("custom_sentence_splitter", first=True)
         doc = german_nlp(words)
         
@@ -101,7 +102,7 @@ def getTokenizerDoc(language, words):
     if language == 'spanish':
         global spanish_nlp
         if spanish_nlp == None:
-            spanish_nlp = spacy.load("es_core_news_sm", disable = ['ner', 'parser'])
+            spanish_nlp = spacy_stanza.load_pipeline("es", processors = "tokenize, lemma")
             spanish_nlp.add_pipe("custom_sentence_splitter", first=True)
         doc = spanish_nlp(words)
 
@@ -115,28 +116,28 @@ def getTokenizerDoc(language, words):
     if language == 'dutch':
         global dutch_nlp
         if dutch_nlp == None:
-            dutch_nlp = spacy.load("nl_core_news_sm", disable = ['ner', 'parser'])
+            dutch_nlp = spacy_stanza.load_pipeline("nl", processors = "tokenize, lemma")
             dutch_nlp.add_pipe("custom_sentence_splitter", first=True)
         doc = dutch_nlp(words)
     
     if language == 'finnish':
         global finnish_nlp
         if finnish_nlp == None:
-            finnish_nlp = spacy.load("fi_core_news_sm", disable = ['ner', 'parser'])
+            finnish_nlp = spacy_stanza.load_pipeline("fi", processors = "tokenize, lemma")
             finnish_nlp.add_pipe("custom_sentence_splitter", first=True)
         doc = finnish_nlp(words)
     
     if language == 'french':
         global french_nlp
         if french_nlp == None:
-            french_nlp = spacy.load("fr_core_news_sm", disable = ['ner', 'parser'])
+            french_nlp = spacy_stanza.load_pipeline("fr", processors = "tokenize, lemma")
             french_nlp.add_pipe("custom_sentence_splitter", first=True)
         doc = french_nlp(words)
     
     if language == 'italian':
         global italian_nlp
         if italian_nlp == None:
-            italian_nlp = spacy.load("it_core_news_sm", disable = ['ner', 'parser'])
+            italian_nlp = spacy_stanza.load_pipeline("it", processors = "tokenize, lemma")
             italian_nlp.add_pipe("custom_sentence_splitter", first=True)
         doc = italian_nlp(words)
 
@@ -164,14 +165,14 @@ def getTokenizerDoc(language, words):
     if language == 'english':
         global english_nlp
         if english_nlp == None:
-            english_nlp = spacy.load("en_core_web_sm", disable = ['ner', 'parser'])
+            english_nlp = spacy_stanza.load_pipeline("en", processors = "tokenize, lemma")
             english_nlp.add_pipe("custom_sentence_splitter", first=True)
         doc = english_nlp(words)
 
     if language == 'greek':
         global greek_nlp
         if greek_nlp == None:
-            greek_nlp = spacy.load("el_core_news_sm", disable = ['ner', 'parser'])
+            greek_nlp = spacy_stanza.load_pipeline("el", processors = "tokenize, lemma")
             greek_nlp.add_pipe("custom_sentence_splitter", first=True)
         doc = greek_nlp(words)
 
@@ -193,7 +194,7 @@ def getTokenizerDoc(language, words):
     if language == 'catalan':
         global catalan_nlp
         if catalan_nlp is None:
-            catalan_nlp = spacy.load("ca_core_news_sm", disable = ['ner', 'parser'])
+            catalan_nlp = spacy_stanza.load_pipeline("ca", processors = "tokenize, lemma")
             catalan_nlp.add_pipe("custom_sentence_splitter", first=True)
         doc = catalan_nlp(words)
     
@@ -228,14 +229,14 @@ def getTokenizerDoc(language, words):
     if language == 'polish':
         global polish_nlp
         if polish_nlp is None:
-            polish_nlp = spacy.load("pl_core_news_sm", disable = ['ner', 'parser'])
+            polish_nlp = spacy_stanza.load_pipeline("pl", processors = "tokenize, lemma")
             polish_nlp.add_pipe("custom_sentence_splitter", first=True)
         doc = polish_nlp(words)
 
     if language == 'portuguese':
         global portuguese_nlp
         if portuguese_nlp is None:
-            portuguese_nlp = spacy.load("pt_core_news_sm", disable = ['ner', 'parser'])
+            portuguese_nlp = spacy_stanza.load_pipeline("pt", processors = "tokenize, lemma")
             portuguese_nlp.add_pipe("custom_sentence_splitter", first=True)
         doc = portuguese_nlp(words)
 
