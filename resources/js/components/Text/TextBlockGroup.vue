@@ -7,8 +7,16 @@
             'chinese-font': language == 'chinese'
         }"
     >
+        <!-- Delete phrase dialog -->
+        <delete-phrase-dialog 
+            v-model="deletePhraseDialog"
+            @confirm="deletePhrase"
+        />
+
         <!-- Anki api notifications -->
         <v-snackbar
+            v-for="(snackBar, snackBarIndex) in snackBars"
+            :key="'snackbar-' + snackBarIndex"
             :value="true"
             right
             top
@@ -19,8 +27,7 @@
             height="108"
             :style="{'margin-top': ((snackBarIndex) * 124 + 16) + 'px'}"
             :timeout="-1"
-            v-for="(snackBar, snackBarIndex) in snackBars"
-            :key="'snackbar-' + snackBarIndex"
+            @mouseup.native.stop=";"
         >
             <div class="pl-3 pr-2 pt-1 d-flex font-weight-bold snackbar-title">
                 <v-icon v-if="snackBar.type !== 'success' && snackBar.type !== 'update success'" color="error" class="mr-2">mdi-alert</v-icon>
@@ -59,7 +66,7 @@
                     -->{{ subtitleTimestamps[word.subtitleIndex].start }}<!--
                 --></div><!--
                 --><br v-if="word.word === 'NEWLINE'" /><!--
-                --><div
+                --><span
                     v-else
                     :wordindex="wordIndex"
                     :stage="word.stage"
@@ -67,6 +74,7 @@
                     :class="{
                         'no-highlight': hideAllHighlights || (hideNewWordHighlights && word.stage == 2),
                         'word': true,
+                        'selected-font': true,
                         'highlighted': word.selected || word.hover,
                         'phrase': word.phraseIndexes.length,
                         'space-after': word.spaceAfter,
@@ -80,7 +88,7 @@
                     :key="wordIndex"
                 ><!--
                     --><template v-if="$props.language == 'japanese'"><!--
-                        --><ruby class="rubyword" :wordindex="wordIndex"><!--
+                        --><ruby class="rubyword selected-font" :wordindex="wordIndex"><!--
                             -->{{ word.word }}<!--
                             --><rt v-if="word.stage == 2 && furiganaOnNewWords && word.furigana.length && word.word !== word.furigana" :style="{'font-size': (fontSize - 4) + 'px'}"><!--
                                 -->{{ word.furigana }}<!--
@@ -92,7 +100,7 @@
                     </template><!--
                     --><template v-else>{{ word.word }}</template><!--
                     --><template v-if="plainTextMode && word.spaceAfter">&nbsp;</template><!--
-                --></div><!--
+                --></span><!--
             --></template>
         </div>
 
@@ -110,7 +118,7 @@
 
         <!-- Vocabulary popup box -->
         <vocabulary-box
-            v-if="(!$props.vocabularySidebar || !$props.vocabularySidebarFits) && vocabBox.active"
+            v-if="(!$props.vocabularySidebar || !$props.vocabularySidebarFits) && vocabBox.active && (!$props.vocabularyBottomSheet || !vocabBox.vocabularyBottomSheetVisible)"
             ref="vocabularyBox"
             :language="$props.language"
             :active="vocabBox.active"
@@ -122,14 +130,17 @@
             :word="vocabBox.word"
             :phrase="vocabBox.phrase"
             :stage="vocabBox.stage"
+            :inflections="vocabBox.inflections"
             :auto-highlight-words="$props.autoHighlightWords"
             :deepl-enabled="this.deeplEnabled"
+            :textToSpeechAvailable="textToSpeechAvailable"
             :_reading="vocabBox.reading"
             :_baseWord="vocabBox.baseWord"
             :_baseWordReading="vocabBox.baseWordReading"
             :_phraseReading="vocabBox.phraseReading"
             :_translationText="vocabBox.translationText"
             :_searchField="vocabBox.searchField"
+            @textToSpeech="textToSpeech"
             @setStage="setStage"
             @unselectAllWords="unselectAllWords"
             @updateVocabBoxData="updateVocabBoxData"
@@ -137,6 +148,47 @@
             @deletePhrase="deletePhrase"
             @addSelectedWordToAnki="addSelectedWordToAnki"
         ></vocabulary-box>
+
+        <!-- Vocabulary bottom sheet -->
+        <v-bottom-sheet
+            v-if="
+                (!$props.vocabularySidebar || !$props.vocabularySidebarFits) 
+                && vocabBox.active 
+                && $props.vocabularyBottomSheet 
+                && vocabBox.vocabularyBottomSheetVisible
+            "
+            v-model="vocabBox.active"
+            persistent
+            scrollable
+        >
+            <vocabulary-bottom-sheet
+                :key="'vocab-bottom-sheet' + vocabBox.key"
+                :language="$props.language"
+                :active="vocabBox.active"
+                :type="vocabBox.type"
+                :kanjiList="vocabBox.kanjiList"
+                :word="vocabBox.word"
+                :phrase="vocabBox.phrase"
+                :stage="vocabBox.stage"
+                :inflections="vocabBox.inflections"
+                :auto-highlight-words="$props.autoHighlightWords"
+                :deepl-enabled="this.deeplEnabled"
+                :textToSpeechAvailable="textToSpeechAvailable"
+                :_reading="vocabBox.reading"
+                :_baseWord="vocabBox.baseWord"
+                :_baseWordReading="vocabBox.baseWordReading"
+                :_phraseReading="vocabBox.phraseReading"
+                :_translationText="vocabBox.translationText"
+                :_searchField="vocabBox.searchField"
+                @textToSpeech="textToSpeech"
+                @setStage="setStage"
+                @unselectAllWords="unselectAllWords"
+                @updateVocabBoxData="updateVocabBoxData"
+                @addNewPhrase="addNewPhrase"
+                @showDeletePhraseDialog="showDeletePhraseDialog"
+                @addSelectedWordToAnki="addSelectedWordToAnki"
+            ></vocabulary-bottom-sheet>
+        </v-bottom-sheet>
 
         <!--Vocabulary sidebar-->
         <vocabulary-side-box
@@ -153,14 +205,17 @@
             :word="vocabBox.word"
             :phrase="vocabBox.phrase"
             :stage="vocabBox.stage"
+            :inflections="vocabBox.inflections"
             :auto-highlight-words="$props.autoHighlightWords"
             :deepl-enabled="this.deeplEnabled"
+            :textToSpeechAvailable="textToSpeechAvailable"
             :_reading="vocabBox.reading"
             :_baseWord="vocabBox.baseWord"
             :_baseWordReading="vocabBox.baseWordReading"
             :_phraseReading="vocabBox.phraseReading"
             :_translationText="vocabBox.translationText"
             :_searchField="vocabBox.searchField"
+            @textToSpeech="textToSpeech"
             @setStage="setStage"
             @unselectAllWords="unselectAllWords"
             @updateVocabBoxData="updateVocabBoxData"
@@ -172,9 +227,17 @@
 </template>
 
 <script>
+    import TextToSpeechService from './../../services/TextToSpeechService';
     export default {
         data: function() {
             return {
+                // dialogs
+                deletePhraseDialog: false,
+
+                // tts
+                textToSpeechService: new TextToSpeechService(this.$props.language, this.$cookie, this.updateTextToSpeechState),
+                textToSpeechAvailable: false,
+
                 // text
                 words: [],
                 uniqueWords: this.$props._text.uniqueWords,
@@ -188,6 +251,8 @@
                 ankiAutoAddCards: false,
                 ankiShowNotifications: false,
                 deeplEnabled: false,
+
+                // hover vocabulary box
                 hoverVocabBox: {
                     hoverVocabularyDelayTimeout: null,
                     dictionarySearchTerm: '',
@@ -204,12 +269,14 @@
                     positionLeft: 0,
                     positionTop: 0,
                 },
+
+                // vocabulary box
                 vocabBox: {
+                    vocabularyBottomSheetVisible: false,
                     /*
                         This is required because sidebar is always visible, and it does not re-render
                         when active is changed.
                     */
-
                     key: 0,
 
                     /*
@@ -218,9 +285,11 @@
                         a text is opened.
                     */
                     sidebarHidden: true,
-
-
                     active: false,
+
+                    // inflections table
+                    inflections: [],
+
                     // word, new phrase, existing phrase
                     type: 'empty',
 
@@ -309,6 +378,10 @@
                 type: Boolean,
                 default: false
             },
+            vocabularyBottomSheet: {
+                type: Boolean,
+                default: false
+            },
             vocabularySidebarFits: {
                 type: Boolean,
                 default: true
@@ -336,8 +409,8 @@
         },
         mounted() {
             this.preProcessWords();
-            window.addEventListener('resize', this.updateVocabBoxPositionDelay);
-            window.addEventListener('mouseup', this.unselectAllWords);
+            window.addEventListener('resize', this.resizeHandle);
+            window.addEventListener('mouseup', this.unselectAllWordsOnEmptyClick);
             window.addEventListener('keydown', this.hotkeyHandle);
             window.addEventListener('mousemove', this.closeHoverBox);
 
@@ -355,16 +428,43 @@
                 this.deeplEnabled = response.data;
             });
 
-            this.updateVocabBoxPositionDelay();
+            this.resizeHandle();
             this.updatePhraseBorders();
+            this.updateTextToSpeechState();
         },
         beforeDestroy() {
-            window.removeEventListener('resize', this.updateVocabBoxPositionDelay);
-            window.removeEventListener('mouseup', this.unselectAllWords);
+            window.removeEventListener('resize', this.resizeHandle);
+            window.removeEventListener('mouseup', this.unselectAllWordsOnEmptyClick);
             window.removeEventListener('keydown', this.hotkeyHandle);
             window.removeEventListener('mousemove', this.closeHoverBox);
         },
         methods: {
+            textToSpeech() {
+                if (!this.selection.length) {
+                    return;
+                }
+
+                if (this.vocabBox.type === 'word') {
+                    var text = this.vocabBox.reading.length ? this.vocabBox.reading : this.vocabBox.word;
+                } else if (this.vocabBox.type !== 'word' && this.vocabBox.reading.length) {
+                    var text = this.vocabBox.reading;
+                } else {
+                    var text = '';
+
+                    this.vocabBox.phrase.forEach((phraseWord, index) => {
+                        if (index) {
+                            text += ' ';
+                        }
+
+                        text += phraseWord.word;
+                    });
+                }
+
+                this.textToSpeechService.speak(text);
+            },
+            updateTextToSpeechState() {
+                this.textToSpeechAvailable = this.textToSpeechService.getLanguageVoices().length > 0;
+            },
             startSelectionTouchEvent: function(event) {
                 var element = event.target
                 if (event.target.localName === 'ruby') {
@@ -413,6 +513,10 @@
 
             },
             updateSelectionTouchEvent: function(event) {
+                if (this.ongoingSelection.length) {
+                    event.preventDefault();
+                }
+                
                 if (this.touchTimer) {
                     clearTimeout(this.touchTimer);
                     this.touchTimer = null;
@@ -443,6 +547,11 @@
                 }
 
                 if (wordIndex === -1) {
+                    if (wordIndex !== this.hoverVocabBox.lastHoveredWordIndex) {
+                        this.closeHoverBox();
+                        this.removePhraseHover();
+                    }
+
                     return;
                 }
                 
@@ -450,10 +559,9 @@
                     this.removePhraseHover();
                 }
 
-                if (wordIndex === -1 && wordIndex !== this.hoverVocabBox.lastHoveredWordIndex) {
-                    this.closeHoverBox();
+                if (wordIndex === -1) {
+                    return;
                 }
-
 
                 if (event.buttons === 0 && wordIndex !== this.hoverVocabBox.lastHoveredWordIndex) {
                     this.updateHoverSelection(wordIndex);
@@ -610,6 +718,7 @@
                 }
 
                 this.selection = this.ongoingSelection;
+                this.vocabBox.inflections = [];
                 this.ongoingSelection = [];
 
                 if (this.selection.length) {
@@ -617,6 +726,8 @@
 
                     // update lookup counts
                     if (this.selection.length == 1) {
+                        var inflectionSearchTerm = this.uniqueWords[uniqueWordIndex].base_word.length ? this.uniqueWords[uniqueWordIndex].base_word : this.uniqueWords[uniqueWordIndex].word;
+                        this.requestInflections(inflectionSearchTerm);
                         this.updateWordLookupCount(this.selection[0].word);
                     } else if (this.selectedPhrase !== -1) {
                         this.updatePhraseLookupCount(this.selectedPhrase);
@@ -625,6 +736,50 @@
                     this.updatePhraseBorders();
                     this.updateVocabBoxDataAfterSelection();
                 }
+            },
+            requestInflections: function(term) {
+                if (this.$props.language !== 'japanese') {
+                    return;
+                }
+
+                // search inflections
+                axios.post('/dictionary/search/inflections', {
+                    term: term
+                }).then((response) => {
+                    if (response.data === '[]' || response.data == '') {
+                        return;
+                    }
+
+                    var data = JSON.parse(response.data);
+                    var displayedInflections = ['Non-past', 'Non-past, polite', 'Past', 'Past, polite', 'Te-form', 'Potential', 'Passive', 'Causative', 'Causative Passive', 'Imperative'];
+                    
+                    for (var i = 0; i < data.length; i++) {
+                        if (!displayedInflections.includes(data[i].name)) {
+                            continue;
+                        }
+
+                        var index = this.vocabBox.inflections.findIndex(item => item.name === data[i].name);
+                        if (index == -1) {
+                            this.vocabBox.inflections.push({
+                                name: data[i].name,
+                            });
+                            index = this.vocabBox.inflections.length - 1;
+                        }
+                        // add different forms to the item
+                        if (data[i].form == 'aff-plain:') {
+                            this.vocabBox.inflections[index].affPlain = data[i].value;
+                        }
+                        if (data[i].form == 'aff-formal:') {
+                            this.vocabBox.inflections[index].affFormal = data[i].value;
+                        }
+                        if (data[i].form == 'neg-plain:') {
+                            this.vocabBox.inflections[index].negPlain = data[i].value;
+                        }
+                        if (data[i].form == 'neg-formal:') {
+                            this.vocabBox.inflections[index].negFormal = data[i].value;
+                        }
+                    }
+                });
             },
             selectPhraseInstanceByWord: function(wordIndex, phraseIndex) {
                 var currentWordIndex = wordIndex;
@@ -845,8 +1000,19 @@
 
                 switch(event.which) {
                     // set level to new
+                    case 86:
+                        if (!event.ctrlKey) {
+                            this.textToSpeech();
+                        }
+                        
+                        break;
+
+                    // set level to new
                     case 67:
-                        this.setStage(2);
+                        if (!event.ctrlKey) {
+                            this.setStage(2);
+                        }
+                        
                         break;
 
                     // set level 0-7
@@ -1125,7 +1291,7 @@
                 }
 
                 this.vocabBox.key ++;
-                this.updateVocabBoxPositionDelay();
+                this.resizeHandle();
                 this.hoverVocabBox.disabledWhileSelecting = false;
             },
             clearHoverVocabularyBoxTimeout() {
@@ -1140,6 +1306,11 @@
                 if (!this.$props.vocabularyHoverBoxSearch) {
                     this.hoverVocabBox.dictionaryTranslation = '';
                     this.hoverVocabBox.deeplTranslation = '';
+                }
+
+                // do not make a search request if a word has been selected 
+                if (this.selection.length) {
+                    return;
                 }
 
                 // do not make search request for empty string
@@ -1195,6 +1366,13 @@
                     });
                 }
             },
+            unselectAllWordsOnEmptyClick(event) {
+                if (event.target.classList.contains('v-overlay__scrim')) {
+                    return;
+                }
+
+                this.unselectAllWords();
+            },
             unselectAllWords() {
                 if (this.selection.length == 1) {
                     this.saveWord();
@@ -1207,6 +1385,7 @@
                 this.vocabBox.active = false;
 
                 this.unselectAllWordsProcess();
+                this.removePhraseHover();
                 this.hoverVocabBox.disabledWhileSelecting = false;
                 this.textBlockKey ++;
             },
@@ -1385,7 +1564,7 @@
                 this.selectedPhrase = this.getSelectedPhraseIndex();
 
                 this.updateSelectedWordStage();
-                this.updateVocabBoxPositionDelay();
+                this.resizeHandle();
                 this.savePhrase();
                 this.vocabBox.type = 'phrase';
             },
@@ -1407,11 +1586,15 @@
 
                 return phraseIndex;
             },
+            showDeletePhraseDialog() {
+                this.deletePhraseDialog = true;
+            },
             deletePhrase() {
                 if (this.selectedPhrase == -1) {
                     return;
                 }
-
+                
+                this.deletePhraseDialog = false;
                 var deletedPhraseId = this.phrases[this.selectedPhrase].id;
                 var deletedPhraseIndex = this.phrases.map(e => e.id).indexOf(deletedPhraseId);
 
@@ -1443,6 +1626,7 @@
 
                 this.selectedPhrase = -1;
                 this.selection = [];
+                this.removePhraseHover();
                 this.unselectAllWords();
                 this.updatePhraseBorders();
             },
@@ -1462,13 +1646,13 @@
 
                 var url = '/vocabulary/phrases/update';
                 var saveData = {
-                    words: JSON.stringify(this.phrases[this.selectedPhrase].words),
                     reading: this.phrases[this.selectedPhrase].reading,
                     translation: this.phrases[this.selectedPhrase].translation,
                     lookup_count: this.phrases[this.selectedPhrase].lookup_count,
                 };
 
                 if (this.phrases[this.selectedPhrase].id === -1) {
+                    saveData.words = JSON.stringify(this.phrases[this.selectedPhrase].words);
                     saveData.stage = this.phrases[this.selectedPhrase].stage;
                     url = '/vocabulary/phrases/create';
                 } else {
@@ -1701,6 +1885,7 @@
             },
             updateExampleSentence() {
                 var exampleSentence = this.getExampleSentence();
+                console.log(exampleSentence);
 
                 var targetType = this.selection.length > 1 ? 'phrase' : 'word';
                 var targetId = this.uniqueWords[this.selection[0].uniqueWordIndex].id;
@@ -1715,7 +1900,10 @@
                     exampleSentenceWords: JSON.stringify(exampleSentence),
                 });
             },
-            updateVocabBoxPositionDelay() {
+            resizeHandle() {
+                // update bottom sheet vocabulary
+                this.vocabBox.vocabularyBottomSheetVisible = window.innerWidth <= 768;
+
                 this.$nextTick(() => {
                     this.updateVocabBoxPosition();
                 });

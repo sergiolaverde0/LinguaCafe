@@ -433,7 +433,6 @@ class DictionaryController extends Controller
         This function searches inflections from JMDict. 
     */
     public function searchInflections(Request $request) {
-        $dictionary = $request->dictionary;
         $term = $request->term;
 
         $ids = [];
@@ -595,6 +594,10 @@ class DictionaryController extends Controller
                     throw new \Exception('Missing data.');
                 }
 
+                if (mb_strlen($record[0]) > 255 || mb_strlen($record[1]) > 2047) {
+                    continue;
+                }
+                
                 DB::table($databaseTableName)->insert([
                     'word' => mb_strtolower($record[0], 'UTF-8'),
                     'definitions' => $record[1]

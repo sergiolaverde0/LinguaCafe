@@ -5,6 +5,191 @@
         </div>
         
         <v-card outlined class="rounded-lg mb-8">
+            <v-card-title>v0.12.6<v-spacer /> 2024.06.05.</v-card-title>
+            <v-card-text>
+                <b>Bug fixes:</b>
+                <ul>
+                    <li>
+                        Using the same LinguaCafe user on multiple devices with multiple languages caused database corruption in some very rare edge cases. Now whenever a user logs in on a device, other devices will be logged out to avoid this issue. This is a temporary solution.
+                    </li>
+                </ul>
+            </v-card-text>
+        </v-card>
+
+        <v-card outlined class="rounded-lg mb-8">
+            <v-card-title>v0.12.5<v-spacer /> 2024.06.01.</v-card-title>
+            <v-card-text>
+                <b>Bug fixes:</b>
+                <ul>
+                    <li>
+                        Fixed a serious security issue.
+                    </li>
+                </ul>
+            </v-card-text>
+        </v-card>
+
+        <v-card outlined class="rounded-lg mb-8">
+            <v-card-title>v0.12.4<v-spacer /> 2024.05.29.</v-card-title>
+            <v-card-text>
+                <b>Bug fixes:</b>
+                <ul>
+                    <li>
+                        Fixed unusable Spanish goals after creating the first user.
+                    </li>
+                </ul>
+            </v-card-text>
+        </v-card>
+        
+        <v-card outlined class="rounded-lg mb-8">
+            <v-card-title>v0.12.3<v-spacer /> 2024.05.22.</v-card-title>
+            <v-card-text>
+                <b>Bug fixes:</b>
+                <ul>
+                    <li>
+                        Fixed Polish font file name, which did not load previously.
+                    </li>
+                </ul>
+            </v-card-text>
+        </v-card>
+
+        <v-card outlined class="rounded-lg mb-8">
+            <v-card-title>v0.12.2<v-spacer /> 2024.05.19.</v-card-title>
+            <v-card-text>
+                <b>Bug fixes:</b>
+                <ul>
+                    <li>
+                        Disabled touch scrolling while selecting text.
+                    </li>
+                    <li>
+                        Fixed a bug that prevented reading and reviewing in browsers that do not support TTS, like Opera.
+                    </li>
+                </ul>
+            </v-card-text>
+        </v-card>
+
+        <v-card outlined class="rounded-lg mb-8">
+            <v-card-title>v0.12.1<v-spacer /> 2024.05.17.</v-card-title>
+            <v-card-text>
+                <b>Bug fixes:</b>
+                <ul>
+                    <li>
+                        Example sentence text overflowed the review card.
+                    </li>
+                    <li>
+                        Added missing folder creation for linguacafe/storage/app/temp. Not having it caused ebook file imports, and Japanese language install to fail.
+                    </li>
+                </ul>
+            </v-card-text>
+        </v-card>
+
+        <v-card outlined class="rounded-lg mb-8">
+            <v-card-title>v0.12<v-spacer /> 2024.05.17.</v-card-title>
+            <v-card-text>
+                <b>New features:</b>
+                <ul>
+                    <li>
+                        Docker installation and update process has been improved. It does not require git and chmod commands anymore (except once for already existing users).
+                    </li>
+                    <li>
+                        Added book length to the library list view.
+                    </li>
+                    <li>
+                        Added word inflections table for Japanese.
+                    </li>
+                    <li>
+                        Added text to speech option for the text reader.
+                    </li>
+                    <li>
+                        Added bottom sheet vocabulary for mobile view.
+                    </li>
+                    <li>
+                        Added progressive web app support. Now users can use LinguaCafe as a full screen mobile app.
+                    </li>
+                    <li>
+                        Added font type management system.
+                    </li>
+                </ul>
+
+                <b>Bug fixes:</b>
+                <ul>
+                    <li>
+                        Added missing kanji images. Now users can see the kanji stroke order and writing animation on the kanji info pages.
+                    </li>
+                    <li>
+                        Book word counts now update after importing something.
+                    </li>
+                    <li>
+                        Hover vocabulary now disappears when the user moves their mouse pointer to empty space.
+                    </li>
+                    <li>
+                        Importing texts now skips too long words instead of throwing an error.
+                    </li>
+                    <li>
+                        Importing dictionaries now skips records that contain a word or a definition that is too long instead of throwing an error.
+                    </li>
+                    <li>
+                        Fixed highlighted word colors that were displayed incorrectly at several places.
+                    </li>
+                    <li>
+                        Interactive text is not selectable anymore on the review page natively like other texts in the browser.
+                    </li>
+                    <li>
+                        Previous example sentences are not visible anymore on the review page while the new one is loading.
+                    </li>
+                    <li>
+                        Users cannot open a chapter in the text reader anymore that does not belong to their selected language.
+                    </li>
+                    <li>
+                        JMDict's source language is not editable anymore.
+                    </li>
+                    <li>
+                        Copying a selected word with ctrl+c won't set the word's level to new anymore.
+                    </li>
+                    <li>
+                        It is now impossible to create a phrase without any words, which would corrupt the database.
+                    </li>
+                    <li>
+                        Fixed light theme's warning color, because it was too yellow and lacking in contrast. For devices that already opened LinguaCafe, users must click on the reset color button to update it.
+                    </li>
+                    <li>
+                        Fixed plain text mode copy-paste in Firefox.
+                    </li>
+                    <li>
+                        Symbols won't be combined anymore with words in Japanese. This only applies to texts that are imported after this update.
+                    </li>
+                    <li>
+                        Fixed a bug that caused text importing to fail in Japanese, if the last word was combined with the previous word during post processing.
+                    </li>
+                    <li>
+                        Polish language had a font type that displayed incorrect letters.
+                    </li>
+                </ul>
+
+                <b>Other changes:</b>
+                <ul>
+                    <li>
+                        The import dialog won't close by itself anymore after importing has finished.
+                    </li>
+                    <li>
+                        Laravel now produces more detailed logs, and logs both to the log file and the docker terminal.
+                    </li>
+                </ul>
+            </v-card-text>
+        </v-card>
+
+        <v-card outlined class="rounded-lg mb-8">
+            <v-card-title>v0.11.3 <v-spacer /> 2024.05.08.</v-card-title>
+            <v-card-text>
+                <b>Bug fixes:</b>
+                <ul>
+                    <li>
+                        Fixed a bug that caused practice review mode to be always turned off.
+                    </li>
+                </ul>
+            </v-card-text>
+        </v-card>
+
+        <v-card outlined class="rounded-lg mb-8">
             <v-card-title>v0.11.2 <v-spacer /> 2024.04.27.</v-card-title>
             <v-card-text>
                 <b>Bug fixes:</b>
@@ -28,12 +213,11 @@
                 <b>Bug fixes:</b>
                 <ul>
                     <li>
-                        Fixed "Hide all highlighting" and "Hide new word highlighting" settings.
+                        Fixed broken "Hide all highlighting" and "Hide new word highlighting" settings.
                     </li>
                 </ul>
             </v-card-text>
         </v-card>
-
 
         <v-card outlined class="rounded-lg mb-8">
             <v-card-title>v0.11 <v-spacer /> 2024.04.25.</v-card-title>

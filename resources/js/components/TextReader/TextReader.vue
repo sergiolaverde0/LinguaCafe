@@ -23,8 +23,10 @@
 
             <!-- Settings -->
             <text-reader-settings
+                v-if="language !== null"
                 v-show="dialogs.settings"
                 v-model="dialogs.settings"
+                :language="language"
                 ref="textReaderSettings"
                 @changed="updateSettings"
             ></text-reader-settings>
@@ -90,6 +92,7 @@
                         :vocabulary-hover-box-search="settings.vocabularyHoverBoxSearch"
                         :vocabulary-hover-box-delay="settings.vocabularyHoverBoxDelay"
                         :vocabulary-sidebar="settings.vocabularySidebar"
+                        :vocabulary-bottom-sheet="settings.vocabularyBottomSheet"
                         :auto-highlight-words="settings.autoHighlightWords"
                         :vocabulary-sidebar-fits="vocabularySidebarFits"
                         :hotkeys-enabled="true"
@@ -196,6 +199,7 @@
                     furiganaOnNewWords: false,
                     mediaControlsVisible: true,
                     vocabularySidebar: true,
+                    vocabularyBottomSheet: true,
                     vocabularyHoverBox: true,
                     vocabularyHoverBoxSearch: true,
                     vocabularyHoverBoxDelay: 300,

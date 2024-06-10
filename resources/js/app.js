@@ -85,15 +85,19 @@ Vue.component('statistics', Statistics);
 import TextBlock from './components/Text/TextBlock.vue';
 import TextBlockGroup from './components/Text/TextBlockGroup.vue';
 import VocabularyBox from './components/Text/VocabularyBox.vue';
+import VocabularyBottomSheet from './components/Text/VocabularyBottomSheet.vue';
 import VocabularyHoverBox from './components/Text/VocabularyHoverBox.vue';
 import VocabularySideBox from './components/Text/VocabularySideBox.vue';
 import VocabularySearchBox from './components/Text/VocabularySearchBox.vue';
+import DeletePhraseDialog from './components/Text/DeletePhraseDialog.vue';
 Vue.component('text-block', TextBlock);
 Vue.component('text-block-group', TextBlockGroup);
 Vue.component('vocabulary-box', VocabularyBox);
+Vue.component('vocabulary-bottom-sheet', VocabularyBottomSheet);
 Vue.component('vocabulary-hover-box', VocabularyHoverBox);
 Vue.component('vocabulary-side-box', VocabularySideBox);
 Vue.component('vocabulary-search-box', VocabularySearchBox);
+Vue.component('delete-phrase-dialog', DeletePhraseDialog);
 
 // text reader
 import TextReaderSettings from './components/TextReader/TextReaderSettings.vue';
@@ -143,6 +147,9 @@ Vue.component('user-settings-themes', UserSettingsThemes);
 
 // admin settings
 import AdminUserSettings from './components/Admin/AdminUserSettings';
+import AdminFontTypeSettings from './components/Admin/AdminFontTypeSettings';
+import AdminEditFontTypeDialog from './components/Admin/AdminEditFontTypeDialog';
+import AdminDeleteFontTypeDialog from './components/Admin/AdminDeleteFontTypeDialog';
 import AdminLanguageSettings from './components/Admin/AdminLanguageSettings';
 import AdminInstallLanguageDialog from './components/Admin/AdminInstallLanguageDialog';
 import AdminUninstallLanguagesDialog from './components/Admin/AdminUninstallLanguagesDialog';
@@ -157,6 +164,9 @@ import AdminEditUserDialog from './components/Admin/AdminEditUserDialog';
 import AdminReviewSettings from './components/Admin/AdminReviewSettings';
 Vue.component('admin-user-settings', AdminUserSettings);
 Vue.component('admin-language-settings', AdminLanguageSettings);
+Vue.component('admin-font-type-settings', AdminFontTypeSettings);
+Vue.component('admin-edit-font-type-dialog', AdminEditFontTypeDialog);
+Vue.component('admin-delete-font-type-dialog', AdminDeleteFontTypeDialog);
 Vue.component('admin-install-language-dialog', AdminInstallLanguageDialog);
 Vue.component('admin-uninstall-languages-dialog', AdminUninstallLanguagesDialog);
 Vue.component('admin-dictionary-settings', AdminDictionarySettings);

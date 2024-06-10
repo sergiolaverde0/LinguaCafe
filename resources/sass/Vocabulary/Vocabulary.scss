@@ -10,20 +10,6 @@ div.v-list.filter-popup {
 }
 
 #vocabulary {
-    #vocabulary-list {
-        .word, .translation {
-            font-family: notosans-jp !important;
-        }
-    }
-
-    &.chinese-font #vocabulary-list {
-        .word, .translation {
-            font-family: notosans-sc !important;
-        }
-
-        font-family: notosans-sc !important;
-    }
-
     #filters .filter-menu {
         &.show-filters {
             display: none;
@@ -102,7 +88,7 @@ div.v-list.filter-popup {
                 line-height: 26px;
 
                 &.highlighted-word {
-                    background-color: var(--v-highlightedWordLevel1-base);
+                    background-color: var(--v-highlightedWordLevel7-base);
                 }
 
                 &.new-word {
@@ -175,7 +161,7 @@ div.v-list.filter-popup {
 // style for e-ink theme
 #app main.eink #vocabulary #vocabulary-list .stage div {
     &.highlighted-word {
-        background-color: var(--v-highlightedWordLevel1-base);
+        background-color: var(--v-highlightedWordLevel7-base);
         color: var(--v-highlightedWordText-base);
     }
 

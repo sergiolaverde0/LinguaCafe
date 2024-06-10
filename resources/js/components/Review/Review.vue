@@ -18,6 +18,7 @@
             v-show="settingsDialog"
             v-model="settingsDialog"
             ref="reviewSettings"
+            :language="language"
             @changed="updateSettings"
         ></review-settings>
         
@@ -109,7 +110,15 @@
                 <v-btn title="Fullscreen" icon class="my-2" @click="openFullscreen" v-if="!fullscreen"><v-icon>mdi-arrow-expand-all</v-icon></v-btn>
                 <v-btn title="Exit fullscreen" icon class="my-2" @click="exitFullscreen" v-if="fullscreen"><v-icon>mdi-arrow-collapse-all</v-icon></v-btn>
                 <v-btn title="Review settings" icon @click="settingsDialog = true;"><v-icon>mdi-cog</v-icon></v-btn>
-                
+                <v-btn 
+                    class="my-2"
+                    icon
+                    title="Text to speech"
+                    :disabled="!textToSpeechAvailable"
+                    @click="textToSpeech"
+                >
+                    <v-icon>mdi-bullhorn</v-icon>
+                </v-btn>
                 
                 <v-menu offset-y left class="rounded-lg">
                     <template v-slot:activator="{ on, attrs }">
@@ -173,13 +182,13 @@
                             <!-- Word review -->
                             <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'word'">
                                 <!-- Example sentence mode -->
-                                <div :style="{'font-size': (settings.fontSize) + 'px'}">
+                                <div :style="{'font-size': (settings.fontSize) + 'px'}" class="selected-font">
                                     <template v-if="reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
                                     {{ reviews[currentReviewIndex].word }}<hr>
 
                                     <!-- Example sentence interactive text mode -->
                                     <text-block-group
-                                        v-if="!revealed && settings.reviewSentenceMode === 'interactive-text'"
+                                        v-if="!revealed && exampleSentence !== null && settings.reviewSentenceMode === 'interactive-text'"
                                         ref="textBlock"
                                         :key="'text-block-1' + textBlockKey"
                                         :theme="theme"
@@ -193,21 +202,22 @@
                                         :vocabulary-hover-box="settings.vocabularyHoverBox"
                                         :vocabulary-hover-box-search="settings.vocabularyHoverBoxSearch"
                                         :vocabulary-hover-box-delay="settings.vocabularyHoverBoxDelay"
+                                        :vocabulary-bottom-sheet="settings.vocabularyBottomSheet"
                                     />
 
                                     <!-- Example sentence plain text mode -->
-                                    <template v-if="settings.reviewSentenceMode === 'plain-text' && reviews[currentReviewIndex] !== undefined">
+                                    <template v-if="exampleSentence !== null && settings.reviewSentenceMode === 'plain-text' && reviews[currentReviewIndex] !== undefined">
                                         <div class="phrase-words" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                            <span 
+                                            <span
                                                 v-for="(word, wordIndex) in exampleSentence.words" :key="wordIndex"
-                                                :class="{'mr-2': word.spaceAfter}"
+                                                :class="{'selected-font': true, 'mr-2': word.spaceAfter}"
                                             >{{ word.word }}</span>
                                         </div>
                                     </template>
                                 </div>
-                                
+
                                 <!-- Single word  mode -->
-                                <div class="single-word" v-if="!settings.reviewSentenceMode" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                <div class="single-word selected-font" v-if="!settings.reviewSentenceMode" :style="{'font-size': (settings.fontSize) + 'px'}">
                                     <template v-if="reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
                                     {{ reviews[currentReviewIndex].word }}
                                 </div>
@@ -216,7 +226,7 @@
                             <!-- Phrase review -->
                             <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'phrase'">
                                 <!-- Phrase only mode -->
-                                <div class="phrase-words" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                <div class="phrase-words selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
                                     <template v-if="languageSpaces">
                                         {{ JSON.parse(reviews[currentReviewIndex].words).join(' ') }}
                                     </template>
@@ -227,7 +237,7 @@
                                     <!-- Example sentence interactive text mode -->
                                     <hr v-if="settings.reviewSentenceMode !== 'disabled'">
                                     <text-block-group
-                                        v-if="!revealed && settings.reviewSentenceMode === 'interactive-text'"
+                                        v-if="!revealed && exampleSentence !== null && settings.reviewSentenceMode === 'interactive-text'"
                                         ref="textBlock"
                                         :key="'text-block-2' + textBlockKey"
                                         :theme="theme"
@@ -241,14 +251,15 @@
                                         :vocabulary-hover-box="settings.vocabularyHoverBox"
                                         :vocabulary-hover-box-search="settings.vocabularyHoverBoxSearch"
                                         :vocabulary-hover-box-delay="settings.vocabularyHoverBoxDelay"
+                                        :vocabulary-bottom-sheet="settings.vocabularyBottomSheet"
                                     />
 
                                     <!-- Example sentence plain text mode -->
-                                    <template v-if="settings.reviewSentenceMode === 'plain-text' && reviews[currentReviewIndex] !== undefined">
+                                    <template v-if="exampleSentence !== null && settings.reviewSentenceMode === 'plain-text' && reviews[currentReviewIndex] !== undefined">
                                         <div class="phrase-words" :style="{'font-size': (settings.fontSize) + 'px'}">
                                             <span 
                                                 v-for="(word, wordIndex) in exampleSentence.words" :key="wordIndex"
-                                                :class="{'mr-2': word.spaceAfter}"
+                                                :class="{'selected-font': true, 'mr-2': word.spaceAfter}"
                                             >{{ word.word }}</span>
                                         </div>
                                     </template>
@@ -266,14 +277,15 @@
                             <!-- Word review -->
                             <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'word'">
                                 <!-- Single word  mode -->
-                                <div class="word" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                <div class="word selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
                                     <template v-if="reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
                                     {{ reviews[currentReviewIndex].word }}
                                 </div>
                             </template>
 
+                            <!-- Phrase review -->
                             <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'phrase'">
-                                <div :style="{'font-size': (settings.fontSize) + 'px'}">
+                                <div class="selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
                                     <template v-if="languageSpaces">
                                         {{ JSON.parse(reviews[currentReviewIndex].words).join(' ') }}
                                     </template>
@@ -284,7 +296,7 @@
                             </template>
 
                             <!-- Reading -->
-                            <div class="reading" v-if="reviews[currentReviewIndex] !== undefined && (language == 'japanese' || language == 'chinese')" :style="{'font-size': (settings.fontSize) + 'px'}">
+                            <div class="reading selected-font" v-if="reviews[currentReviewIndex] !== undefined && (language == 'japanese' || language == 'chinese')" :style="{'font-size': (settings.fontSize) + 'px'}">
                                 <hr>
                                 <template v-if="reviews[currentReviewIndex].type == 'word' && reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word_reading }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
                                 {{ reviews[currentReviewIndex].reading }}
@@ -293,7 +305,7 @@
                             <!-- Example sentence interactive text mode -->
                             <hr v-if="settings.reviewSentenceMode !== 'disabled'">
                             <text-block-group
-                                v-if="revealed && settings.reviewSentenceMode === 'interactive-text'"
+                                v-if="revealed && exampleSentence !== null && settings.reviewSentenceMode === 'interactive-text'"
                                 ref="textBlock"
                                 :key="'text-block-3' + textBlockKey"
                                 :theme="theme"
@@ -307,14 +319,15 @@
                                 :vocabulary-hover-box="settings.vocabularyHoverBox"
                                 :vocabulary-hover-box-search="settings.vocabularyHoverBoxSearch"
                                 :vocabulary-hover-box-delay="settings.vocabularyHoverBoxDelay"
+                                :vocabulary-bottom-sheet="settings.vocabularyBottomSheet"
                             />
 
                             <!-- Example sentence plain text mode -->
-                            <template v-if="settings.reviewSentenceMode === 'plain-text' && reviews[currentReviewIndex] !== undefined">
+                            <template v-if="exampleSentence !== null && settings.reviewSentenceMode === 'plain-text' && reviews[currentReviewIndex] !== undefined">
                                 <div class="phrase-words" :style="{'font-size': (settings.fontSize) + 'px'}">
                                     <span 
                                         v-for="(word, wordIndex) in exampleSentence.words" :key="wordIndex"
-                                        :class="{'mr-2': word.spaceAfter}"
+                                        :class="{'selected-font': true, 'mr-2': word.spaceAfter}"
                                     >{{ word.word }}</span>
                                 </div>
                             </template>
@@ -340,10 +353,13 @@
 
 <script>
     const moment = require('moment');
+    import TextToSpeechService from './../../services/TextToSpeechService';
     import {formatNumber} from './../../helper.js';
     export default {
         data: function() {
             return {
+                textToSpeechService: null,
+                textToSpeechAvailable: false,
                 theme: (this.$cookie.get('theme') === null ) ? 'light' : this.$cookie.get('theme'),
                 hotkeyDialog: false,
                 textBlockKey: 0,
@@ -368,6 +384,7 @@
                     vocabularyHoverBox: true,
                     vocabularyHoverBoxSearch: true,
                     vocabularyHoverBoxDelay: 300,
+                    vocabularyBottomSheet: true,
                 },
                 transitionDuration: this.$cookie.get('theme') === 'eink' ? 0 : 400,
                 fullscreen: false,
@@ -424,6 +441,7 @@
                     this.finish();
                 }
 
+                this.textToSpeechService = new TextToSpeechService(this.language, this.$cookie, this.updateTextToSpeechState);
                 window.addEventListener('keyup', this.hotkey);
             });
         },
@@ -431,6 +449,29 @@
             window.removeEventListener('keyup', this.hotkey);
         },
         methods: {
+            textToSpeech() {
+                var text = '';
+                var joinSeparator = this.languageSpaces ? ' ' : '';
+
+                if (this.reviews[this.currentReviewIndex].type == 'phrase') {
+                    if (this.reviews[this.currentReviewIndex].reading.length) {
+                        text = this.reviews[this.currentReviewIndex].reading;
+                    } else {
+                        text = JSON.parse(this.reviews[this.currentReviewIndex].words).join(joinSeparator);
+                    }
+                } else {
+                    if (this.reviews[this.currentReviewIndex].reading.length) {
+                        text = this.reviews[this.currentReviewIndex].reading;
+                    } else {
+                        text = this.reviews[this.currentReviewIndex].word;
+                    }
+                }
+
+                this.textToSpeechService.speak(text);
+            },
+            updateTextToSpeechState() {
+                this.textToSpeechAvailable = this.textToSpeechService.getLanguageVoices().length > 0;
+            },
             hotkey (event) {
                 if (!this.finished && !this.revealed && event.which == 13) {
                     this.reveal();
@@ -478,7 +519,7 @@
                     return;
                 }
                 
-                if (this.settings.reviewSentenceMode === 'interactive-text') {
+                if (this.$refs.textBlock !== undefined && this.settings.reviewSentenceMode === 'interactive-text') {
                     this.$refs.textBlock.unselectAllWords(true);
                 }
                 
@@ -604,27 +645,20 @@
                 this.intoTheCorrectDeckAnimation = false;
                 this.newCardAnimation = true;
                 this.backgroundColor = this.$vuetify.theme.currentTheme.foreground;
+                
+                if (this.$refs.textBlock !== undefined && this.settings.reviewSentenceMode === 'interactive-text') {
+                    this.$refs.textBlock.unselectAllWords(true);
+                }
 
                 setTimeout(() => {
-                    if (this.settings.reviewSentenceMode === 'interactive-text') {
-                        this.$refs.textBlock.unselectAllWords(true);
-                    }
-
                     this.newCardAnimation = false;
                 }, this.transitionDuration);
 
                 this.finishedReviews ++;
                 this.currentReviewIndex = Math.floor(Math.random() * this.reviews.length);
-                this.exampleSentence = {
-                    id: -1,
-                    words: [],
-                    phrases: [],
-                    uniqueWords: [],
-                };
 
+                this.exampleSentence = null;
                 axios.get('/vocabulary/example-sentence/' + this.reviews[this.currentReviewIndex].type + '/' + this.reviews[this.currentReviewIndex].id).then((response) => {
-                    let firstTime = (this.exampleSentence.id == -1);
-
                     if (response.data !== 'no example sentence') {
                         this.exampleSentence = {
                             id: 0,

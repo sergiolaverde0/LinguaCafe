@@ -12,18 +12,7 @@
             'width': $props.width + 'px'
         }"
         @mouseup.stop=";"
-    >
-        <v-overlay 
-            v-if="active && phraseCurrentlySaving"
-            class="text-center rounded-lg" 
-            absolute 
-            :value="phraseCurrentlySaving" 
-            opacity="0.6" 
-        >
-            <span class="h5">Saving phrase, please wait a second.</span><br><br>
-            <v-progress-circular indeterminate size="64" color="white"></v-progress-circular>
-        </v-overlay>
-        
+    >   
         <!-- Vocab box content -->
         <div class="vocab-box-content pa-4 pb-1">
             <v-tabs-items v-model="tab">
@@ -34,7 +23,7 @@
                         <template v-if="$props.type === 'word'">
                             <div class="vocab-box-subheader mb-2 mt-0"><span class="rounded-pill py-1 px-3">Word</span></div>
                             <!-- With base word -->
-                            <div class="expression mb-2 text-center" v-if="baseWord !== ''">
+                            <div class="expression mb-2 text-center default-font" v-if="baseWord !== ''">
                                 <ruby>
                                     {{ baseWord }}
                                     <rt v-if="($props.language == 'japanese' || $props.language == 'chinese')">
@@ -52,7 +41,7 @@
                             
                             <!-- No base word -->
                             <div 
-                                class="expression mb-2 text-center" 
+                                class="expression mb-2 text-center default-font" 
                                 v-if="baseWord == ''"
                             >
                                 <ruby>
@@ -68,7 +57,7 @@
                         <template v-if="$props.type !== 'word'">
                             <div class="vocab-box-subheader mb-2 mt-0"><span class="rounded-pill py-1 px-3">Phrase</span></div>
                             <!-- Phrase text -->
-                            <div class="expression mb-2">
+                            <div class="expression mb-2 default-font">
                                 <template v-for="(word, index) in phrase" v-if="word.word !== 'NEWLINE'">
                                     <span :class="{'mr-2': word.spaceAfter}">{{ word.word }}</span>
                                 </template>
@@ -77,7 +66,7 @@
                             <!-- Phrase reading -->
                             <template v-if="($props.language == 'japanese' || $props.language == 'chinese')">
                                 <div class="vocab-box-subheader mb-2 mt-4"><span class="rounded-pill py-1 px-3">Reading</span></div>
-                                <div class="expression mb-2 mt-4">{{ reading }}</div>
+                                <div class="expression mb-2 mt-4 default-font">{{ reading }}</div>
                             </template>
                         </template>
                         
@@ -95,16 +84,6 @@
                                     {{ kanji }}
                                 </div>
                             </div>
-                        </template>
-                        -->
-
-                        <!-- Definitions -->
-                        <!--
-                        <template v-if="translationList.length">
-                            <div class="vocab-box-subheader mb-2 mt-4"><span class="rounded-pill py-1 px-3">Definitions</span></div>
-                            <ul id="definitions" class="ma-0">
-                                <li v-for="(translation, index) in translationList" :key="index">{{ translation }}</li>
-                            </ul>
                         </template>
                         -->
 
@@ -175,7 +154,7 @@
                         <!-- Search field -->
                         <v-text-field 
                             placeholder="Dictionary search"
-                            class="dictionary-search-field mt-2 mb-3"
+                            class="dictionary-search-field mt-2 mb-3 default-font"
                             filled
                             dense
                             rounded
@@ -221,7 +200,7 @@
                         <!-- Word text fields -->
                         <div class="d-flex" v-if="$props.type == 'word'">
                             <v-text-field 
-                                :class="{'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}"
+                                :class="{'default-font': true, 'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}"
                                 hide-details
                                 label="Lemma"
                                 filled
@@ -232,7 +211,7 @@
                                 @keydown.stop=";"
                             ></v-text-field>
                             <v-text-field 
-                                :class="{'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}"
+                                :class="{'default-font': true, 'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}"
                                 hide-details
                                 label="Word"
                                 disabled
@@ -248,7 +227,7 @@
                         <!-- Reading fields -->
                         <div class="d-flex" v-if="$props.type == 'word' && ($props.language == 'japanese' || $props.language == 'chinese')">
                             <v-text-field 
-                                class="my-2"
+                                class="my-2 default-font"
                                 hide-details
                                 label="Lemma reading"
                                 filled
@@ -259,7 +238,7 @@
                                 @keydown.stop=";"
                             ></v-text-field>
                             <v-text-field 
-                                class="my-2"
+                                class="my-2 default-font"
                                 hide-details
                                 label="Reading"
                                 filled
@@ -274,7 +253,7 @@
                         <!-- Phrase fields -->
                         <v-textarea
                             v-if="$props.type !== 'word' && ($props.language == 'japanese' || $props.language == 'chinese')"
-                            class="my-2"
+                            class="my-2 default-font"
                             label="Reading"
                             filled
                             dense
@@ -288,30 +267,40 @@
                         ></v-textarea>
                     </v-card-text>
                 </v-tab-item>
+
+                <!-- Inflections tab -->
+                <v-tab-item :value="2">
+                    <v-simple-table
+                        v-if="$props.inflections.length"
+                        class="border rounded-lg no-hover mx-auto default-font" 
+                    >
+                        <thead>
+                            <tr>
+                                <th class="text-center">Form</th>
+                                <th class="text-center">Affirmative</th>
+                                <th class="text-center">Negative</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(inflection, index) in $props.inflections" :key="index">
+                                <td class="px-2">{{ inflection.name }}</td>
+                                <td class="px-1 text-center">{{ inflection.affPlain }}</td>
+                                <td class="px-1 text-center">{{ inflection.negPlain }}</td>
+                            </tr>
+                        </tbody>
+                    </v-simple-table>
+                </v-tab-item>
             </v-tabs-items>
         </div>
 
         <!-- Vocab box toolbar -->
         <div class="vocab-box-toolbar d-flex flex-column align-center flex-wrap pt-1 rounded-r-lg">
-            <v-btn dark icon @click="close" title="Close"><v-icon>mdi-close</v-icon></v-btn>
-            <v-btn dark icon @click="tab = 1;" title="Edit" v-if="tab == 0"><v-icon>mdi-pencil</v-icon></v-btn>
-            <v-btn dark icon @click="tab = 0;" v-if="tab == 1" title="Back"><v-icon>mdi-arrow-left</v-icon></v-btn>
-
-            <!-- Options menu-->
-            <v-menu left offset-y class="rounded-lg">
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn dark icon v-bind="attrs" v-on="on" title="More options">
-                        <v-icon>mdi-dots-horizontal</v-icon>
-                    </v-btn>
-                </template>
-                <v-btn 
-                    v-if="$props.type !== 'new-phrase'"
-                    class="menu-button justify-start" 
-                    @mouseup.stop="addSelectedWordToAnki"
-                >
-                    <v-icon class="mr-1">mdi-cards</v-icon>Send to anki
-                </v-btn>
-            </v-menu>
+            <v-btn icon @click="close" title="Close"><v-icon>mdi-close</v-icon></v-btn>
+            <v-btn icon @click="tab = 1;" title="Edit" v-if="tab == 0"><v-icon>mdi-pencil</v-icon></v-btn>
+            <v-btn icon @click="addSelectedWordToAnki" v-if="tab === 0 && $props.type !== 'new-phrase'" title="Send to anki"><v-icon class="mr-1">mdi-cards</v-icon></v-btn>
+            <v-btn icon v-if="tab == 0 && $props.textToSpeechAvailable" title="Text to speech" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
+            <v-btn icon @click="tab = 2;" title="Show inflections" v-if="tab == 0 && $props.inflections.length"><v-icon>mdi-list-box</v-icon></v-btn>
+            <v-btn icon @click="tab = 0;" v-if="tab !== 0" title="Back"><v-icon>mdi-arrow-left</v-icon></v-btn>
         </div>
     </v-card>
 </template>
@@ -327,7 +316,9 @@
             phrase: Array,
             kanjiList: Array,
             stage: Number,
+            inflections: Array,
             deeplEnabled: Boolean,
+            textToSpeechAvailable: Boolean,
             _reading: String,
             _baseWord: String,
             _baseWordReading: String,
@@ -340,9 +331,6 @@
         },
         data: function() {
             return {
-                //temp, to be reviewed
-                phraseCurrentlySaving: false,
-
                 // data for word
                 reading: this.$props._reading,
                 baseWord: this.$props._baseWord,
@@ -362,6 +350,9 @@
         mounted: function() {
         },
         methods: {
+            textToSpeech() {
+                this.$emit('textToSpeech');
+            },
             searchFieldChanged(event) {
                 if (event === '') {
                     return;

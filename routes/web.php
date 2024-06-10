@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Route;
 Auth::routes([
     'register' => false,
     'reset' => false,
-    'verify' => false
+    'verify' => false,
+    'login' => false,
 ]);
 
 /*
@@ -27,6 +28,10 @@ Route::group(['middleware' => 'web'], function () {
     Route::post('/users/create', [App\Http\Controllers\UserController::class, 'createUser']);
 });
 
+// login
+Route::get('/login', [App\Http\Controllers\UserController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [App\Http\Controllers\UserController::class, 'authenticateUser']);
+ 
 Route::group(['middleware' => ['auth', 'web']], function () {
     Route::get ('/users/get', [App\Http\Controllers\UserController::class, 'getUsers']);
 
@@ -79,6 +84,14 @@ Route::group(['middleware' => ['auth', 'web']], function () {
     // user manual
     Route::get('/manual/get-menu-tree', [App\Http\Controllers\HomeController::class, 'getUserManualTree']);
     Route::get('/manual/get-manual-file/{fileName}', [App\Http\Controllers\HomeController::class, 'getUserManualFile']);
+    
+    // fonts
+    Route::get ('/fonts/get', [App\Http\Controllers\FontTypeController::class, 'getInstalledFontTypes']);
+    Route::post('/fonts/upload', [App\Http\Controllers\FontTypeController::class, 'uploadFontType']);
+    Route::post('/fonts/update', [App\Http\Controllers\FontTypeController::class, 'updateFontType']);
+    Route::post('/fonts/delete', [App\Http\Controllers\FontTypeController::class, 'deleteFontType']);
+    Route::get('/fonts/get-fonts-for-language/{language}', [App\Http\Controllers\FontTypeController::class, 'getFontTypesForLanguage']);
+    Route::get('/fonts/file/{fileName}', [App\Http\Controllers\FontTypeController::class, 'getFontTypeFile']);
 
     // goals
     Route::post('/goals/get', [App\Http\Controllers\GoalController::class, 'getGoals']);
@@ -95,6 +108,7 @@ Route::group(['middleware' => ['auth', 'web']], function () {
     
     // images 
     Route::get('/images/book_images/{fileName}', [App\Http\Controllers\ImageController::class, 'getBookImage']);
+    Route::get('/images/kanji/{fileName}', [App\Http\Controllers\ImageController::class, 'getKanjiImage']);
 
     // dictionaries
     Route::get('/dictionaries/scan', [App\Http\Controllers\DictionaryController::class, 'getImportableDictionaryList']);

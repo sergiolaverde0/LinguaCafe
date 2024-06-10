@@ -1,11 +1,12 @@
 <template>
-    <v-container id="vocabulary" :class="{'chinese-font': $props.language == 'chinese'}">
+    <v-container id="vocabulary">
         <!-- Vocabulary edit dialog -->
         <vocabulary-edit-dialog 
             v-if="vocabularyEditDialog.active"
             v-model="vocabularyEditDialog.active" 
             :item-id="vocabularyEditDialog.itemId" 
             :item-type="vocabularyEditDialog.itemType" 
+            :language-spaces="languageSpaces"
             :language="$props.language"
             @saved="loadVocabularySearchPage"
         ></vocabulary-edit-dialog>
@@ -16,7 +17,7 @@
             v-model="vocabularyExportDialog.active" 
             :sample-words="words"
             :language="$props.language"
-            :languageSpaces="languageSpaces"
+            :language-spaces="languageSpaces"
             @export-to-csv="exportToCsv"
         ></vocabulary-export-dialog>
 
@@ -83,7 +84,7 @@
                                 <v-list-item :class="{'v-list-item--active': filters.book == -1}" @click="applyFilter('book', -1, -1)">Any</v-list-item>
                                 <v-list-item 
                                     v-for="(book, index) in books" :key="index"
-                                    :class="{'v-list-item--active': filters.book == book.id}"
+                                    :class="{'default-font': true, 'v-list-item--active': filters.book == book.id}"
                                     @click="applyFilter('book', book.id, index)">{{ book.name }}</v-list-item>
                                 </v-list-item>
                             </v-list-item-group>
@@ -104,7 +105,7 @@
                                 <v-list-item :class="{'v-list-item--active': filters.chapter == -1}" @click="applyFilter('chapter', -1)">Any</v-list-item>
                                 <v-list-item 
                                     v-for="(chapter, index) in books[filters.bookIndex].chapters" :key="index"
-                                    :class="{'v-list-item--active': filters.chapter == chapter.id}"
+                                    :class="{'default-font': true, 'v-list-item--active': filters.chapter == chapter.id}"
                                     @click="applyFilter('chapter', chapter.id, index)">{{ chapter.name }}</v-list-item>
                                 </v-list-item>
                             </v-list-item-group>
@@ -226,28 +227,26 @@
             <tbody>
                 <tr v-for="(word, index) in words" :key="index">
                     <template v-if="word.type == 'phrase'">
-                        <td class="word" v-if="!languageSpaces">{{ (JSON.parse(word.word)).join('') }}</td>
-                        <td class="word" v-if="languageSpaces">{{ (JSON.parse(word.word)).join(' ') }}</td>
+                        <td class="word default-font" v-if="!languageSpaces">{{ (JSON.parse(word.word)).join('') }}</td>
+                        <td class="word default-font" v-if="languageSpaces">{{ (JSON.parse(word.word)).join(' ') }}</td>
                     </template>
                     <template v-if="word.type == 'word'">
-                        <td class="word">{{ word.word }}</td>
+                        <td class="word default-font">{{ word.word }}</td>
                     </template>
-                    <td class="reading" v-if="($props.language == 'japanese' || $props.language == 'chinese')">{{ word.reading }}</td>
+                    <td class="reading default-font" v-if="($props.language == 'japanese' || $props.language == 'chinese')">{{ word.reading }}</td>
                     
                     <template v-if="word.type == 'phrase'">
-                        <td class="word-with-reading" v-if="!languageSpaces">
+                        <td class="word-with-reading default-font" v-if="!languageSpaces">
                             {{ (JSON.parse(word.word)).join('') }}
                         </td>
-                        <td class="word-with-reading" v-if="languageSpaces">
+                        <td class="word-with-reading default-font" v-if="languageSpaces">
                             {{ (JSON.parse(word.word)).join(' ') }}
                         </td>
                     </template>
                     <template v-if="word.type == 'word'">
-                        <td class="word-with-reading"><ruby>{{ word.word }}<rt v-if="($props.language == 'japanese' || $props.language == 'chinese')">{{ word.reading }}</rt></ruby></td>
+                        <td class="word-with-reading default-font"><ruby>{{ word.word }}<rt v-if="($props.language == 'japanese' || $props.language == 'chinese')">{{ word.reading }}</rt></ruby></td>
                     </template>
 
-                    
-                    
                     <td class="stage px-1" :stage="word.stage" v-if="word.stage < 0">
                         <div class="highlighted-word">{{ word.stage * -1 }}</div>
                     </td>

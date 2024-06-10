@@ -22,12 +22,8 @@
     margin: auto;
     background-color: var(--v-background-base);
 
-    #review * {
-        font-family: notosans-jp !important;
-    }
-
-    &.chinese-font #review * {
-        font-family: notosans-sc !important;
+    .text-block-group {
+        user-select: none !important;
     }
 
     .review-button-box {

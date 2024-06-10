@@ -158,6 +158,7 @@ class TextBlock
         $this->processedWords = [];
         $processedWordCount = 0;
         $wordCount = count($this->tokenizedWords);
+        $wordsToSkip = config('linguacafe.words_to_skip');
 
         $thaiSentenceIndex = 0;
         for ($wordIndex = 0; $wordIndex < $wordCount; $wordIndex++) {
@@ -179,9 +180,9 @@ class TextBlock
             $word->phrase_ids = [];
 
             // japanese post processing
-            if ($this->language == 'japanese' && $word->word !== 'NEWLINE') {
+            if ($this->language == 'japanese' && $wordIndex < $wordCount - 1 && !in_array($word->word, $wordsToSkip, true) && !in_array($this->tokenizedWords[$wordIndex + 1]->w, $wordsToSkip, true)) {
                 // combine 2 verbs after eachother into one word
-                if ($wordIndex < $wordCount - 1 && $this->tokenizedWords[$wordIndex]->pos == 'VERB' && $this->tokenizedWords[$wordIndex + 1]->pos == 'VERB') {
+                if ($this->tokenizedWords[$wordIndex]->pos == 'VERB' && $this->tokenizedWords[$wordIndex + 1]->pos == 'VERB') {
                     $wordIndex ++;
                     $word->word .= $this->tokenizedWords[$wordIndex]->w;
                     $word->reading .= $this->tokenizedWords[$wordIndex]->r;
@@ -190,17 +191,22 @@ class TextBlock
                 }
                 
                 // Combine VERB + AUX and VERB + SCONJ. It's more logical for the user.
-                if ($this->tokenizedWords[$wordIndex]->pos == 'VERB' && $this->tokenizedWords[$wordIndex]->w !== $this->tokenizedWords[$wordIndex]->l && $wordIndex < $wordCount - 1 && $this->tokenizedWords[$wordIndex + 1]->pos == 'AUX') {
+                if ($this->tokenizedWords[$wordIndex]->pos == 'VERB' && $this->tokenizedWords[$wordIndex]->w !== $this->tokenizedWords[$wordIndex]->l && $this->tokenizedWords[$wordIndex + 1]->pos == 'AUX') {
                     do {
                         $wordIndex ++;
+
+                        if ($wordIndex === $wordCount) {
+                            break;
+                        }
+
                         if ($this->tokenizedWords[$wordIndex]->pos == 'AUX') {
                             $word->word .= $this->tokenizedWords[$wordIndex]->w;
                             $word->reading .= $this->tokenizedWords[$wordIndex]->r;
                         } else {
                             $wordIndex --; break;
                         }
-                    } while($this->tokenizedWords[$wordIndex]->pos == 'AUX' && $wordIndex < $wordCount - 1);
-                } else if ($this->tokenizedWords[$wordIndex]->pos == 'VERB' && $this->tokenizedWords[$wordIndex]->w !== $this->tokenizedWords[$wordIndex]->l && $wordIndex < $wordCount - 1 && $this->tokenizedWords[$wordIndex + 1]->pos == 'SCONJ') {
+                    } while($this->tokenizedWords[$wordIndex]->pos == 'AUX');
+                } else if ($this->tokenizedWords[$wordIndex]->pos == 'VERB' && $this->tokenizedWords[$wordIndex]->w !== $this->tokenizedWords[$wordIndex]->l && $this->tokenizedWords[$wordIndex + 1]->pos == 'SCONJ') {
                     do {
                         $wordIndex ++;
                         if ($this->tokenizedWords[$wordIndex]->pos == 'SCONJ') {
@@ -209,7 +215,7 @@ class TextBlock
                         } else {
                             $wordIndex --; break;
                         }
-                    } while($this->tokenizedWords[$wordIndex]->pos == 'SCONJ' && $wordIndex < $wordCount - 1);
+                    } while($this->tokenizedWords[$wordIndex]->pos == 'SCONJ');
                 }
             }
 
@@ -280,8 +286,17 @@ class TextBlock
                 // nouns' lemma needs der/die/das before them
                 $word->lemma = str_replace('+', '', $word->lemma);
             }
+
+            // limit text length
+            if (mb_strlen($word->word) > 255) {
+                continue;
+            }
+
+            $word->lemma = mb_strlen($word->lemma) > 255 ? mb_substr($word->lemma, 0, 255) : $word->lemma;
+            $word->reading = mb_strlen($word->reading) > 255 ? mb_substr($word->reading, 0, 255) : $word->reading;
+            $word->lemma_reading = mb_strlen($word->lemma_reading) > 255 ? mb_substr($word->lemma_reading, 0, 255) : $word->lemma_reading;
             
-            $this->processedWords[$processedWordCount] = $word;
+            $this->processedWords[$processedWordCount] = $word; 
             $processedWordCount ++;
         }
     }
@@ -329,8 +344,8 @@ class TextBlock
             $encounteredWord['word'] = mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8');
             $encounteredWord['lemma'] = mb_strtolower($this->processedWords[$wordIndex]->lemma);
             $encounteredWord['base_word'] = mb_strtolower($this->processedWords[$wordIndex]->lemma);
-            $encounteredWord['kanji'] = $this->language == 'japanese' || $this->language == 'chinese' ? implode('', $kanji) : '';
             $encounteredWord['reading'] = $this->processedWords[$wordIndex]->reading;
+            $encounteredWord['kanji'] = $this->language == 'japanese' || $this->language == 'chinese' ? implode('', $kanji) : '';
             $encounteredWord['base_word_reading'] = $this->processedWords[$wordIndex]->lemma_reading;
             $encounteredWord['example_sentence'] = '';
             $encounteredWord['stage'] = 2;
