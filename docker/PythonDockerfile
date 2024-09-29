@@ -48,7 +48,6 @@ RUN python3 -m spacy download de_core_news_sm \
     && python3 -m spacy download sv_core_news_sm \
     && python3 -m spacy download uk_core_news_sm
 
-COPY ./tools/django_server /app
+COPY ./tools /app
 
-#start django server (/tools/django_server)
-#RUN /app/manage.py runserver 8678
+CMD [ "export PYTHONPATH=\"${HOME}/.local/bin:${PYTHONPATH}\"" ]
